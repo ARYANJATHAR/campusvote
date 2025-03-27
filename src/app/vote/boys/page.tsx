@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -20,6 +19,8 @@ export default function BoysVotePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewedProfiles, setViewedProfiles] = useState<string[]>([]);
+  const [viewedPairs, setViewedPairs] = useState<Set<string>>(new Set());
+  const [allPairsViewed, setAllPairsViewed] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -35,38 +36,12 @@ export default function BoysVotePage() {
         router.push('/dashboard');
         return;
       }
-    };
 
-    const fetchProfiles = async () => {
-      try {
-        // Fetch all female profiles for male users
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('gender', 'female');
-
-        if (error) throw error;
-        
-        // Shuffle the profiles
-        const shuffledProfiles = shuffleArray(data || []);
-        setProfiles(shuffledProfiles);
-        
-        // Set initial pair
-        if (shuffledProfiles.length >= 2) {
-          const initialPair = [shuffledProfiles[0], shuffledProfiles[1]];
-          setCurrentPair(initialPair);
-          setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
-        }
-      } catch (error) {
-        console.error('Error fetching profiles:', error);
-        setError('Failed to fetch profiles. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
+      // Only fetch profiles if authentication passes
+      fetchProfiles();
     };
 
     checkAuth();
-    fetchProfiles();
   }, [supabase, router]);
 
   // Fisher-Yates shuffle algorithm for randomizing profiles
@@ -79,61 +54,79 @@ export default function BoysVotePage() {
     return newArray;
   };
 
-  const getNextPair = () => {
-    // If all profiles have been viewed, reset the viewed profiles
-    if (viewedProfiles.length >= profiles.length) {
-      setViewedProfiles([]);
-      const reshuffledProfiles = shuffleArray(profiles);
-      setProfiles(reshuffledProfiles);
+  const fetchProfiles = useCallback(async () => {
+    try {
+      // Fetch all female profiles for male users
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('gender', 'female');
+
+      if (error) throw error;
       
-      if (reshuffledProfiles.length >= 2) {
-        setCurrentPair([reshuffledProfiles[0], reshuffledProfiles[1]]);
-        setViewedProfiles([reshuffledProfiles[0].id, reshuffledProfiles[1].id]);
-      } else {
-        setCurrentPair([]);
+      // Shuffle the profiles
+      const shuffledProfiles = shuffleArray(data || []);
+      setProfiles(shuffledProfiles);
+      
+      // Set initial pair
+      if (shuffledProfiles.length >= 2) {
+        const initialPair = [shuffledProfiles[0], shuffledProfiles[1]];
+        setCurrentPair(initialPair);
+        setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
+        // Add this pair to viewed pairs
+        setViewedPairs(new Set([`${shuffledProfiles[0].id}-${shuffledProfiles[1].id}`]));
       }
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+      setError('Failed to fetch profiles. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  const getNextPair = () => {
+    // Check if all possible pairs have been viewed
+    const totalProfiles = profiles.length;
+    const totalPossiblePairs = (totalProfiles * (totalProfiles - 1)) / 2; // n*(n-1)/2 combinations
+    
+    if (viewedPairs.size >= totalPossiblePairs) {
+      setAllPairsViewed(true);
+      setCurrentPair([]);
       return;
     }
-
-    // Get profiles that haven't been viewed yet
-    const remainingProfiles = profiles.filter(
-      profile => !viewedProfiles.includes(profile.id)
-    );
     
-    if (remainingProfiles.length >= 2) {
-      const nextPair = [remainingProfiles[0], remainingProfiles[1]];
-      setCurrentPair(nextPair);
-      setViewedProfiles([...viewedProfiles, remainingProfiles[0].id, remainingProfiles[1].id]);
-    } else if (remainingProfiles.length === 1) {
-      // Find a profile that hasn't been shown recently (at least 2 sets ago)
-      const olderViewedProfiles = viewedProfiles.slice(0, viewedProfiles.length - 4);
-      if (olderViewedProfiles.length > 0) {
-        // Randomly select one of the older viewed profiles
-        const randomIndex = Math.floor(Math.random() * olderViewedProfiles.length);
-        const randomOldProfileId = olderViewedProfiles[randomIndex];
-        const randomOldProfile = profiles.find(p => p.id === randomOldProfileId);
-        
-        if (randomOldProfile) {
-          setCurrentPair([remainingProfiles[0], randomOldProfile]);
-          setViewedProfiles([...viewedProfiles, remainingProfiles[0].id]);
-        } else {
-          setCurrentPair([]);
-        }
-      } else {
-        setCurrentPair([]);
-      }
-    } else {
-      // Reset and start over with reshuffled profiles
-      const reshuffledProfiles = shuffleArray(profiles);
-      setProfiles(reshuffledProfiles);
-      setViewedProfiles([]);
+    // Try to find a pair that hasn't been viewed yet
+    let attempts = 0;
+    const maxAttempts = 50; // Limit attempts to prevent infinite loop
+    
+    while (attempts < maxAttempts) {
+      attempts++;
       
-      if (reshuffledProfiles.length >= 2) {
-        setCurrentPair([reshuffledProfiles[0], reshuffledProfiles[1]]);
-        setViewedProfiles([reshuffledProfiles[0].id, reshuffledProfiles[1].id]);
-      } else {
-        setCurrentPair([]);
+      // Get two random profiles
+      const remainingProfiles = shuffleArray([...profiles]);
+      
+      if (remainingProfiles.length < 2) break;
+      
+      const profile1 = remainingProfiles[0];
+      const profile2 = remainingProfiles[1];
+      
+      // Create a unique identifier for this pair (sorted to ensure same pair in different order is considered the same)
+      const pairIds = [profile1.id, profile2.id].sort();
+      const pairKey = `${pairIds[0]}-${pairIds[1]}`;
+      
+      // Check if this pair has been viewed
+      if (!viewedPairs.has(pairKey)) {
+        // New pair found
+        setCurrentPair([profile1, profile2]);
+        setViewedPairs(new Set([...viewedPairs, pairKey]));
+        return;
       }
+    }
+    
+    // If we've exhausted all possibilities or attempts
+    if (attempts >= maxAttempts) {
+      setAllPairsViewed(true);
+      setCurrentPair([]);
     }
   };
 
@@ -222,7 +215,6 @@ export default function BoysVotePage() {
             </Button>
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
@@ -232,82 +224,91 @@ export default function BoysVotePage() {
       <Navbar />
       <main className="flex-grow bg-gradient-to-b from-purple-50 to-pink-50 flex items-center justify-center p-4 pt-24">
         <div className="w-full max-w-5xl">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Vote for Your Favorite</h1>
-            <p className="text-sm text-gray-600">Click to vote for your favorite profile</p>
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-3">
+              <GradientText className="bg-gradient-to-r from-purple-600 to-pink-600">
+                Vote for Your Favorite
+              </GradientText>
+            </h1>
+            <p className="text-gray-600">Click to vote for your favorite profile</p>
           </div>
 
           {currentPair.length === 0 ? (
             <div className="text-center py-12 bg-white/80 rounded-2xl shadow-xl p-8 border border-gray-100">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">No more profiles to vote!</h2>
-              <p className="text-gray-600 mb-6">Check back later for more profiles to vote on.</p>
-              <Button
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">No more profiles to vote!</h2>
+              {allPairsViewed ? (
+                <p className="text-gray-600 mb-6">You've seen all possible profile combinations. Please check back later for new profiles!</p>
+              ) : (
+                <p className="text-gray-600 mb-6">Check back later for more profiles to vote on.</p>
+              )}
+              <GradientButton
                 onClick={() => router.push('/leaderboard')}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
               >
+                <i className="fas fa-trophy mr-2"></i>
                 View Leaderboard
-              </Button>
+              </GradientButton>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {currentPair.map((profile) => (
                 <Card 
                   key={profile.id} 
-                  className="w-full p-3 transition-all duration-200 hover:shadow-md"
+                  className="w-full p-4 bg-white/80 border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
                 >
-                  <div className="flex flex-col gap-3">
-                    <div className="relative aspect-[4/3] rounded-lg overflow-hidden">
+                  <div className="flex flex-col gap-4">
+                    <div className="relative aspect-[4/3] rounded-xl overflow-hidden ring-2 ring-purple-100">
                       <img
                         src={profile.profile_image || '/default-avatar.png'}
                         alt={profile.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                       />
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div>
-                        <h2 className="text-base font-bold text-gray-800">{profile.name}</h2>
-                        <p className="text-xs text-gray-600">{profile.age} years old</p>
+                        <h2 className="text-lg font-bold text-gray-800">{profile.name}</h2>
+                        <p className="text-sm text-gray-600">{profile.age} years old</p>
                       </div>
 
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <i className="fa-solid fa-graduation-cap text-purple-600 text-sm"></i>
-                          <span className="text-xs text-gray-700">{profile.college_name}</span>
+                          <span className="text-sm text-gray-700">{profile.college_name}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <i className="fa-solid fa-book text-purple-600 text-sm"></i>
-                          <span className="text-xs text-gray-700">{profile.education}</span>
+                          <span className="text-sm text-gray-700">{profile.education}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <i className="fa-solid fa-calendar text-purple-600 text-sm"></i>
-                          <span className="text-xs text-gray-700">{profile.year}</span>
+                          <span className="text-sm text-gray-700">{profile.year}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <i className="fa-solid fa-location-dot text-purple-600 text-sm"></i>
-                          <span className="text-xs text-gray-700">
+                          <span className="text-sm text-gray-700">
                             {profile.city}, {profile.state}
                           </span>
                         </div>
                       </div>
 
                       <div>
-                        <h3 className="text-xs font-medium text-gray-700 mb-1">Hobbies & Interests</h3>
-                        <div className="flex flex-wrap gap-1">
+                        <h3 className="text-sm font-medium text-gray-700 mb-2">Hobbies & Interests</h3>
+                        <div className="flex flex-wrap gap-2">
                           {profile.hobbies.split(", ").map((hobby: string, index: number) => (
-                            <Badge key={index} variant="secondary" className="text-[10px]">
+                            <Badge key={index} variant="secondary" className="bg-purple-50 text-purple-600 hover:bg-purple-100">
                               {hobby}
                             </Badge>
                           ))}
                         </div>
                       </div>
 
-                      <Button
+                      <GradientButton
                         onClick={() => handleVote(profile.id)}
-                        className="w-full h-8 text-sm bg-purple-600 hover:bg-purple-700 text-white"
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
                       >
                         <i className="fa-solid fa-heart mr-2"></i> Vote
-                      </Button>
+                      </GradientButton>
                     </div>
                   </div>
                 </Card>
@@ -316,7 +317,6 @@ export default function BoysVotePage() {
           )}
         </div>
       </main>
-      <Footer />
     </div>
   );
 } 

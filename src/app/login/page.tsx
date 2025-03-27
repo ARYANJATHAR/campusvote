@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase";
 import { X, Eye, EyeOff } from "lucide-react";
 
@@ -108,10 +107,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-indigo-50 to-purple-50">
       <Navbar />
-      <main className="flex-grow bg-gradient-to-b from-indigo-50 to-purple-50 flex items-center justify-center p-4 pt-20 pb-16">
-        <Card className="w-full max-w-md p-8 shadow-xl">
+      <main className="flex-grow flex items-center justify-center px-4">
+        <Card className="w-full max-w-md p-8 shadow-xl bg-white/95 backdrop-blur-sm">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center space-x-2 mb-4">
               <i className="fa-solid fa-heart-pulse text-3xl text-indigo-600"></i>
@@ -241,7 +240,6 @@ export default function LoginPage() {
           </div>
         </Card>
       </main>
-      <Footer />
     </div>
   );
 } 

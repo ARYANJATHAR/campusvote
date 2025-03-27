@@ -7,6 +7,8 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
+import { calculateUserRank } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function Leaderboard() {
   const supabase = createClient();
@@ -73,14 +75,18 @@ export default function Leaderboard() {
         return;
       }
 
-      console.log('New leaderboard data:', profiles?.map(p => ({
+      // Sort profiles by votes in descending order
+      const sortedProfiles = profiles?.sort((a, b) => b.votes - a.votes) || [];
+      
+      console.log('New leaderboard data:', sortedProfiles.map(p => ({
         name: p.name,
         votes: p.votes
       })));
       
-      setLeaderboardData(profiles || []);
+      setLeaderboardData(sortedProfiles);
     } catch (error) {
       console.error("Error in getLeaderboardData:", error);
+      toast.error("Failed to fetch leaderboard data");
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -132,9 +138,13 @@ export default function Leaderboard() {
     };
   }, []);
 
-  const filteredData = leaderboardData.filter(profile => {
-    return profile.gender === (selectedGender === 'boys' ? 'male' : 'female');
-  });
+  const filteredData = leaderboardData
+    .filter(profile => profile.gender === (selectedGender === 'boys' ? 'male' : 'female'))
+    .sort((a, b) => b.votes - a.votes)
+    .map((profile, index) => ({
+      ...profile,
+      rank: index + 1
+    }));
 
   if (loading) {
     return (
@@ -225,10 +235,10 @@ export default function Leaderboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredData.map((student, index) => (
+                      {filteredData.map((student) => (
                         <tr key={student.id} className="hover:bg-indigo-50/50 transition-colors duration-300">
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">
-                            #{index + 1}
+                            {student.rank}
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">

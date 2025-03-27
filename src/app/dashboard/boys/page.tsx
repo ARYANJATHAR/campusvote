@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { 
@@ -25,6 +24,8 @@ import {
 import Link from "next/link";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
+import { calculateUserRank, subscribeToRankUpdates } from "@/lib/utils";
+import { toast } from "react-hot-toast";
 
 interface Profile {
   id: string;
@@ -34,7 +35,7 @@ interface Profile {
   education: string;
   year: string;
   city: string;
-  state: string;
+  bio: string;
   hobbies: string;
   profile_image: string | null;
   votes: number;
@@ -128,16 +129,9 @@ export default function BoysDashboard() {
 
       if (profileError) throw profileError;
 
-      // Get rank
-      const { data: rankings, error: rankError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("gender", "male")
-        .order("votes", { ascending: false });
-
-      if (rankError) throw rankError;
-      
-      const rank = rankings.findIndex((p: { id: string }) => p.id === userId) + 1;
+      // Get rank using the utility function
+      const rank = await calculateUserRank(userId, 'male');
+      if (!rank) throw new Error("Failed to calculate rank");
 
       // Get votes today
       const today = new Date();
@@ -169,8 +163,21 @@ export default function BoysDashboard() {
         votesToday: todayVotes || 0,
         votesThisWeek: weekVotes || 0
       });
+
+      // Subscribe to rank updates
+      const subscription = subscribeToRankUpdates(userId, 'male', (newRank) => {
+        setStats(prevStats => ({
+          ...prevStats,
+          rank: newRank
+        }));
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
     } catch (error) {
       console.error("Error fetching stats:", error);
+      toast.error("Failed to fetch stats");
     }
   };
 
@@ -254,6 +261,13 @@ export default function BoysDashboard() {
         return;
       }
 
+      // Add timestamp to profile image to ensure cache busting
+      if (profile.profile_image) {
+        const timestamp = new Date().getTime();
+        const separator = profile.profile_image.includes('?') ? '&' : '?';
+        profile.profile_image = `${profile.profile_image}${separator}t=${timestamp}`;
+      }
+
       setUserProfile(profile);
       fetchStats(session.user.id);
       fetchRecentVoters(session.user.id);
@@ -261,51 +275,65 @@ export default function BoysDashboard() {
 
     getUserProfile();
 
-    // Set up real-time subscriptions
-    const votesSubscription = supabase
-      .channel('votes_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'votes',
-          filter: `voted_for_id=eq.${userProfile?.id}`
-        },
-        (payload) => {
-          console.log('Votes update received:', payload);
-          if (userProfile?.id) {
-            fetchStats(userProfile.id);
-            fetchRecentVoters(userProfile.id);
+    // Setup real-time subscription for the user ID from the session
+    const setupSubscriptions = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      
+      const userId = session.user.id;
+      
+      const votesSubscription = supabase
+        .channel('votes_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'votes',
+            filter: `voted_for_id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Votes update received:', payload);
+            fetchStats(userId);
+            fetchRecentVoters(userId);
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    const profileSubscription = supabase
-      .channel('profile_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${userProfile?.id}`
-        },
-        (payload) => {
-          console.log('Profile update received:', payload);
-          if (userProfile?.id) {
-            getUserProfile();
+      const profileSubscription = supabase
+        .channel('profile_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Profile update received:', payload);
+            getUserProfile(); // This will refresh the profile data
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    return () => {
-      votesSubscription.unsubscribe();
-      profileSubscription.unsubscribe();
+      return { votesSubscription, profileSubscription };
     };
-  }, [supabase, router, userProfile?.id]);
+
+    // Set up subscriptions and store cleanup function
+    let subscriptions: any;
+    setupSubscriptions().then(subs => {
+      subscriptions = subs;
+    });
+
+    // Cleanup function
+    return () => {
+      if (subscriptions) {
+        subscriptions.votesSubscription?.unsubscribe();
+        subscriptions.profileSubscription?.unsubscribe();
+      }
+    };
+  }, [supabase, router]);  // Remove userProfile?.id dependency to avoid re-subscribing
 
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -364,6 +392,7 @@ export default function BoysDashboard() {
                       src={userProfile.profile_image || '/default-avatar.png'}
                       alt={userProfile.name}
                       className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                      key={userProfile.profile_image || 'default'}
                     />
                   </div>
                   <h2 className="text-xl font-bold text-gray-800 mb-1">{userProfile.name}</h2>
@@ -385,8 +414,12 @@ export default function BoysDashboard() {
                     <div className="flex items-center space-x-2">
                       <MapPin className="w-4 h-4 text-indigo-600" />
                       <span className="text-sm text-gray-700">
-                        {userProfile.city}, {userProfile.state}
+                        {userProfile.city}
                       </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Book className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm text-gray-700">{userProfile.bio}</span>
                     </div>
                   </div>
 
@@ -526,7 +559,6 @@ export default function BoysDashboard() {
           </div>
         </div>
       </main>
-      <Footer />
     </div>
   );
 } 

@@ -16,7 +16,7 @@ export function Hero() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
               <span className="text-gray-900">Vote for Your</span>{" "}
               <GradientText className="bg-gradient-to-r from-indigo-600 to-purple-600 animate-gradient">
-                Campus Crush
+                Campus Favorite
               </GradientText>
             </h1>
             <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
@@ -49,15 +49,15 @@ export function Hero() {
 
           {/* Right column - Image */}
           <div className="relative">
-            <div className="relative aspect-[4/3] sm:aspect-[3/4] md:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-500">
+            <div className="relative aspect-[4/3] sm:aspect-[4/3] md:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-500">
               {!imageLoaded && (
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 animate-pulse"></div>
               )}
               <Image
-                src="/Generated Image March 23, 2025 - 11_56PM.png.jpeg"
-                alt="Campus voting illustration"
+                src="/landing_page.png"
+                alt="Students using mobile phones together"
                 fill
-                className={`object-contain transition-opacity duration-500 ${
+                className={`object-cover transition-opacity duration-500 ${
                   imageLoaded ? "opacity-100" : "opacity-0"
                 }`}
                 onLoad={() => setImageLoaded(true)}

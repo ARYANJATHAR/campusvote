@@ -8,8 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { createClient } from "@/lib/supabase";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { Upload, User, Camera, Save } from "lucide-react";
@@ -20,6 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { createClient } from "@/lib/supabase";
+import { Label } from "@/components/ui/label";
+
+interface ProfileFormData {
+  name: string;
+  age: string;
+  collegeName: string;
+  education: string;
+  year: string;
+  city: string;
+  hobbies: string;
+  bio: string;
+  profileImage: File | null;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -32,8 +44,8 @@ export default function RegisterPage() {
     education: "",
     year: "",
     city: "",
-    state: "",
     hobbies: "",
+    bio: "",
     profileImage: null as File | null,
   });
 
@@ -125,8 +137,8 @@ export default function RegisterPage() {
     if (!formData.education) errors.education = "Education level is required";
     if (!formData.year) errors.year = "Current year is required";
     if (!formData.city.trim()) errors.city = "City is required";
-    if (!formData.state.trim()) errors.state = "State is required";
     if (!formData.hobbies.trim()) errors.hobbies = "Hobbies are required";
+    if (!formData.bio.trim()) errors.bio = "Bio is required";
     if (!formData.profileImage) errors.profileImage = "Profile image is required";
 
     // Validate age if provided
@@ -187,25 +199,34 @@ export default function RegisterPage() {
       }
 
       // Update user profile in Supabase
-      const { error: updateError } = await supabase
+      const { data: profileData, error: updateError } = await supabase
         .from('profiles')
         .upsert({
-          id: session.user.id, // Use id instead of user_id
-          name: formData.name,
+          id: session.user.id,
+          name: formData.name.trim(),
           age: parseInt(formData.age),
-          college_name: formData.collegeName,
-          education: formData.education,
+          college_name: formData.collegeName.trim(),
+          education: formData.education.trim(),
           year: formData.year,
-          city: formData.city,
-          state: formData.state,
-          hobbies: formData.hobbies,
+          city: formData.city.trim(),
+          hobbies: formData.hobbies.trim(),
+          bio: formData.bio.trim(),
           profile_image: profileImageUrl,
-          gender: session.user.user_metadata?.gender, // Add gender from user metadata
+          gender: session.user.user_metadata?.gender,
+          votes: 0, // Initialize votes to 0
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id',
+          returning: true // Add this to get the updated data back
         });
 
       if (updateError) {
-        console.error('Profile update error:', updateError);
-        throw new Error('Failed to update profile');
+        console.error('Profile update error details:', {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint
+        });
+        throw new Error(`Failed to update profile: ${updateError.message}`);
       }
 
       // Get user's gender from metadata
@@ -342,48 +363,33 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="collegeName" className="text-sm font-medium text-gray-700">
-                  College Name
-                </label>
+              <div className="space-y-3">
+                <Label htmlFor="college_name" className="text-gray-700">College Name</Label>
                 <Input
-                  id="collegeName"
+                  id="college_name"
                   name="collegeName"
-                  type="text"
-                  placeholder="Enter your college name"
                   value={formData.collegeName}
                   onChange={handleChange}
-                  className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
                   required
+                  className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="education" className="text-sm font-medium text-gray-700">
-                  Education Level
-                </label>
-                <Select
+              <div className="space-y-3">
+                <Label htmlFor="education" className="text-gray-700">Education Level</Label>
+                <Input
+                  id="education"
+                  name="education"
                   value={formData.education}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, education: value }))
-                  }
-                >
-                  <SelectTrigger className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200">
-                    <SelectValue placeholder="Select education level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
-                    <SelectItem value="master">Master's Degree</SelectItem>
-                    <SelectItem value="phd">PhD</SelectItem>
-                    <SelectItem value="diploma">Diploma</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={handleChange}
+                  placeholder="e.g., Bachelor's in Computer Science"
+                  required
+                  className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
+                />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="year" className="text-sm font-medium text-gray-700">
-                  Current Year
-                </label>
+              <div className="space-y-3">
+                <Label htmlFor="year" className="text-gray-700">Year</Label>
                 <Select
                   value={formData.year}
                   onValueChange={(value) =>
@@ -398,41 +404,33 @@ export default function RegisterPage() {
                     <SelectItem value="2">2nd Year</SelectItem>
                     <SelectItem value="3">3rd Year</SelectItem>
                     <SelectItem value="4">4th Year</SelectItem>
-                    <SelectItem value="5">5th Year</SelectItem>
                     <SelectItem value="graduate">Graduate</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="city" className="text-sm font-medium text-gray-700">
-                  City
-                </label>
+              <div className="space-y-3">
+                <Label htmlFor="city" className="text-gray-700">City</Label>
                 <Input
                   id="city"
                   name="city"
-                  type="text"
-                  placeholder="Enter your city"
                   value={formData.city}
                   onChange={handleChange}
-                  className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
                   required
+                  className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="state" className="text-sm font-medium text-gray-700">
-                  State
-                </label>
-                <Input
-                  id="state"
-                  name="state"
-                  type="text"
-                  placeholder="Enter your state"
-                  value={formData.state}
+              <div className="space-y-3">
+                <Label htmlFor="bio" className="text-gray-700">Bio</Label>
+                <Textarea
+                  id="bio"
+                  name="bio"
+                  value={formData.bio}
                   onChange={handleChange}
-                  className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
+                  placeholder="Tell us about yourself..."
                   required
+                  className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200 min-h-[100px]"
                 />
               </div>
             </div>
@@ -463,7 +461,6 @@ export default function RegisterPage() {
           </form>
         </Card>
       </main>
-      <Footer />
     </div>
   );
 } 

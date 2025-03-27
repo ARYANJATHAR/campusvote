@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -20,6 +19,8 @@ export default function GirlsVotePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewedProfiles, setViewedProfiles] = useState<string[]>([]);
+  const [viewedPairs, setViewedPairs] = useState<Set<string>>(new Set());
+  const [allPairsViewed, setAllPairsViewed] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -35,38 +36,12 @@ export default function GirlsVotePage() {
         router.push('/dashboard');
         return;
       }
-    };
 
-    const fetchProfiles = async () => {
-      try {
-        // Fetch all male profiles for female users
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('gender', 'male');
-
-        if (error) throw error;
-        
-        // Shuffle the profiles
-        const shuffledProfiles = shuffleArray(data || []);
-        setProfiles(shuffledProfiles);
-        
-        // Set initial pair
-        if (shuffledProfiles.length >= 2) {
-          const initialPair = [shuffledProfiles[0], shuffledProfiles[1]];
-          setCurrentPair(initialPair);
-          setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
-        }
-      } catch (error) {
-        console.error('Error fetching profiles:', error);
-        setError('Failed to fetch profiles. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
+      // Only fetch profiles if authentication passes
+      fetchProfiles();
     };
 
     checkAuth();
-    fetchProfiles();
   }, [supabase, router]);
 
   // Fisher-Yates shuffle algorithm for randomizing profiles
@@ -79,61 +54,79 @@ export default function GirlsVotePage() {
     return newArray;
   };
 
-  const getNextPair = () => {
-    // If all profiles have been viewed, reset the viewed profiles
-    if (viewedProfiles.length >= profiles.length) {
-      setViewedProfiles([]);
-      const reshuffledProfiles = shuffleArray(profiles);
-      setProfiles(reshuffledProfiles);
+  const fetchProfiles = useCallback(async () => {
+    try {
+      // Fetch all male profiles for female users
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('gender', 'male');
+
+      if (error) throw error;
       
-      if (reshuffledProfiles.length >= 2) {
-        setCurrentPair([reshuffledProfiles[0], reshuffledProfiles[1]]);
-        setViewedProfiles([reshuffledProfiles[0].id, reshuffledProfiles[1].id]);
-      } else {
-        setCurrentPair([]);
+      // Shuffle the profiles
+      const shuffledProfiles = shuffleArray(data || []);
+      setProfiles(shuffledProfiles);
+      
+      // Set initial pair
+      if (shuffledProfiles.length >= 2) {
+        const initialPair = [shuffledProfiles[0], shuffledProfiles[1]];
+        setCurrentPair(initialPair);
+        setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
+        // Add this pair to viewed pairs
+        setViewedPairs(new Set([`${shuffledProfiles[0].id}-${shuffledProfiles[1].id}`]));
       }
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+      setError('Failed to fetch profiles. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  const getNextPair = () => {
+    // Check if all possible pairs have been viewed
+    const totalProfiles = profiles.length;
+    const totalPossiblePairs = (totalProfiles * (totalProfiles - 1)) / 2; // n*(n-1)/2 combinations
+    
+    if (viewedPairs.size >= totalPossiblePairs) {
+      setAllPairsViewed(true);
+      setCurrentPair([]);
       return;
     }
-
-    // Get profiles that haven't been viewed yet
-    const remainingProfiles = profiles.filter(
-      profile => !viewedProfiles.includes(profile.id)
-    );
     
-    if (remainingProfiles.length >= 2) {
-      const nextPair = [remainingProfiles[0], remainingProfiles[1]];
-      setCurrentPair(nextPair);
-      setViewedProfiles([...viewedProfiles, remainingProfiles[0].id, remainingProfiles[1].id]);
-    } else if (remainingProfiles.length === 1) {
-      // Find a profile that hasn't been shown recently (at least 2 sets ago)
-      const olderViewedProfiles = viewedProfiles.slice(0, viewedProfiles.length - 4);
-      if (olderViewedProfiles.length > 0) {
-        // Randomly select one of the older viewed profiles
-        const randomIndex = Math.floor(Math.random() * olderViewedProfiles.length);
-        const randomOldProfileId = olderViewedProfiles[randomIndex];
-        const randomOldProfile = profiles.find(p => p.id === randomOldProfileId);
-        
-        if (randomOldProfile) {
-          setCurrentPair([remainingProfiles[0], randomOldProfile]);
-          setViewedProfiles([...viewedProfiles, remainingProfiles[0].id]);
-        } else {
-          setCurrentPair([]);
-        }
-      } else {
-        setCurrentPair([]);
-      }
-    } else {
-      // Reset and start over with reshuffled profiles
-      const reshuffledProfiles = shuffleArray(profiles);
-      setProfiles(reshuffledProfiles);
-      setViewedProfiles([]);
+    // Try to find a pair that hasn't been viewed yet
+    let attempts = 0;
+    const maxAttempts = 50; // Limit attempts to prevent infinite loop
+    
+    while (attempts < maxAttempts) {
+      attempts++;
       
-      if (reshuffledProfiles.length >= 2) {
-        setCurrentPair([reshuffledProfiles[0], reshuffledProfiles[1]]);
-        setViewedProfiles([reshuffledProfiles[0].id, reshuffledProfiles[1].id]);
-      } else {
-        setCurrentPair([]);
+      // Get two random profiles
+      const remainingProfiles = shuffleArray([...profiles]);
+      
+      if (remainingProfiles.length < 2) break;
+      
+      const profile1 = remainingProfiles[0];
+      const profile2 = remainingProfiles[1];
+      
+      // Create a unique identifier for this pair (sorted to ensure same pair in different order is considered the same)
+      const pairIds = [profile1.id, profile2.id].sort();
+      const pairKey = `${pairIds[0]}-${pairIds[1]}`;
+      
+      // Check if this pair has been viewed
+      if (!viewedPairs.has(pairKey)) {
+        // New pair found
+        setCurrentPair([profile1, profile2]);
+        setViewedPairs(new Set([...viewedPairs, pairKey]));
+        return;
       }
+    }
+    
+    // If we've exhausted all possibilities or attempts
+    if (attempts >= maxAttempts) {
+      setAllPairsViewed(true);
+      setCurrentPair([]);
     }
   };
 
@@ -222,7 +215,6 @@ export default function GirlsVotePage() {
             </GradientButton>
           </div>
         </main>
-        <Footer />
       </div>
     );
   }
@@ -244,7 +236,11 @@ export default function GirlsVotePage() {
           {currentPair.length === 0 ? (
             <div className="text-center py-12 bg-white/80 rounded-2xl shadow-xl p-8 border border-gray-100">
               <h2 className="text-2xl font-semibold text-gray-800 mb-4">No more profiles to vote!</h2>
-              <p className="text-gray-600 mb-6">Check back later for more profiles to vote on.</p>
+              {allPairsViewed ? (
+                <p className="text-gray-600 mb-6">You've seen all possible profile combinations. Please check back later for new profiles!</p>
+              ) : (
+                <p className="text-gray-600 mb-6">Check back later for more profiles to vote on.</p>
+              )}
               <GradientButton
                 onClick={() => router.push('/leaderboard')}
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
@@ -321,7 +317,6 @@ export default function GirlsVotePage() {
           )}
         </div>
       </main>
-      <Footer />
     </div>
   );
 } 

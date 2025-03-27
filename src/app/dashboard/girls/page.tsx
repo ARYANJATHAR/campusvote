@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { 
@@ -25,6 +24,8 @@ import {
 import Link from "next/link";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
+import { calculateUserRank, subscribeToRankUpdates } from "@/lib/utils";
+import { toast } from "react-hot-toast";
 
 interface Profile {
   id: string;
@@ -34,7 +35,7 @@ interface Profile {
   education: string;
   year: string;
   city: string;
-  state: string;
+  bio: string;
   hobbies: string;
   profile_image: string | null;
   votes: number;
@@ -68,7 +69,7 @@ export default function GirlsDashboardPage() {
     votesThisWeek: 0
   });
   
-  const fetchStats = async (userId: string) => {
+  const fetchStats = useCallback(async (userId: string) => {
     try {
       // Get total votes
       const { data: profile, error: profileError } = await supabase
@@ -79,16 +80,9 @@ export default function GirlsDashboardPage() {
 
       if (profileError) throw profileError;
 
-      // Get rank
-      const { data: rankings, error: rankError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("gender", "female")
-        .order("votes", { ascending: false });
-
-      if (rankError) throw rankError;
-      
-      const rank = rankings.findIndex((p: { id: string }) => p.id === userId) + 1;
+      // Get rank using the utility function
+      const rank = await calculateUserRank(userId, 'female');
+      if (!rank) throw new Error("Failed to calculate rank");
 
       // Get votes today
       const today = new Date();
@@ -120,12 +114,25 @@ export default function GirlsDashboardPage() {
         votesToday: todayVotes || 0,
         votesThisWeek: weekVotes || 0
       });
+
+      // Subscribe to rank updates
+      const subscription = subscribeToRankUpdates(userId, 'female', (newRank) => {
+        setStats(prevStats => ({
+          ...prevStats,
+          rank: newRank
+        }));
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
     } catch (error) {
       console.error("Error fetching stats:", error);
+      toast.error("Failed to fetch stats");
     }
-  };
+  }, [supabase]);
 
-  const fetchRecentVoters = async (userId: string) => {
+  const fetchRecentVoters = useCallback(async (userId: string) => {
     try {
       // First get the votes
       const { data: votes, error: votesError } = await supabase
@@ -177,7 +184,7 @@ export default function GirlsDashboardPage() {
         console.error('Error details:', error.message);
       }
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     const getUserProfile = async () => {
@@ -205,6 +212,13 @@ export default function GirlsDashboardPage() {
         return;
       }
 
+      // Add timestamp to profile image to ensure cache busting
+      if (profile.profile_image) {
+        const timestamp = new Date().getTime();
+        const separator = profile.profile_image.includes('?') ? '&' : '?';
+        profile.profile_image = `${profile.profile_image}${separator}t=${timestamp}`;
+      }
+
       setUserProfile(profile);
       fetchStats(session.user.id);
       fetchRecentVoters(session.user.id);
@@ -212,51 +226,65 @@ export default function GirlsDashboardPage() {
 
     getUserProfile();
 
-    // Set up real-time subscriptions
-    const votesSubscription = supabase
-      .channel('votes_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'votes',
-          filter: `voted_for_id=eq.${userProfile?.id}`
-        },
-        (payload) => {
-          console.log('Votes update received:', payload);
-          if (userProfile?.id) {
-            fetchStats(userProfile.id);
-            fetchRecentVoters(userProfile.id);
+    // Setup real-time subscription for the user ID from the session
+    const setupSubscriptions = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      
+      const userId = session.user.id;
+      
+      const votesSubscription = supabase
+        .channel('votes_changes_girls')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'votes',
+            filter: `voted_for_id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Votes update received:', payload);
+            fetchStats(userId);
+            fetchRecentVoters(userId);
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    const profileSubscription = supabase
-      .channel('profile_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${userProfile?.id}`
-        },
-        (payload) => {
-          console.log('Profile update received:', payload);
-          if (userProfile?.id) {
-            getUserProfile();
+      const profileSubscription = supabase
+        .channel('profile_changes_girls')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Profile update received:', payload);
+            getUserProfile(); // This will refresh the profile data
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
 
-    return () => {
-      votesSubscription.unsubscribe();
-      profileSubscription.unsubscribe();
+      return { votesSubscription, profileSubscription };
     };
-  }, [supabase, router, userProfile?.id]);
+
+    // Set up subscriptions and store cleanup function
+    let subscriptions: any;
+    setupSubscriptions().then(subs => {
+      subscriptions = subs;
+    });
+
+    // Cleanup function
+    return () => {
+      if (subscriptions) {
+        subscriptions.votesSubscription?.unsubscribe();
+        subscriptions.profileSubscription?.unsubscribe();
+      }
+    };
+  }, [supabase, router, fetchStats, fetchRecentVoters]);  // Include the necessary dependencies
 
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -307,59 +335,66 @@ export default function GirlsDashboardPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Profile Card */}
-            <Card className="md:col-span-1 p-6 bg-white/80 backdrop-blur-md border border-gray-100 transition-all duration-300 hover:shadow-xl">
-              <div className="flex flex-col items-center">
-                <div className="relative w-32 h-32 rounded-full overflow-hidden mb-4 ring-2 ring-indigo-100">
-                  <img
-                    src={userProfile.profile_image || '/default-avatar.png'}
-                    alt={userProfile.name}
-                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                  />
-                </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-1">{userProfile.name}</h2>
-                <p className="text-sm text-gray-600 mb-4">{userProfile.age} years old</p>
-                
-                <div className="w-full space-y-3 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <GraduationCap className="w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-gray-700">{userProfile.college_name}</span>
+            {userProfile && (
+              <Card className="md:col-span-1 p-6 bg-white/80 backdrop-blur-md border border-gray-100 transition-all duration-300 hover:shadow-xl">
+                <div className="flex flex-col items-center">
+                  <div className="relative w-32 h-32 rounded-full overflow-hidden mb-4 ring-2 ring-indigo-100">
+                    <img
+                      src={userProfile.profile_image || '/default-avatar.png'}
+                      alt={userProfile.name}
+                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                      key={userProfile.profile_image || 'default'}
+                    />
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Book className="w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-gray-700">{userProfile.education}</span>
+                  <h2 className="text-xl font-bold text-gray-800 mb-1">{userProfile.name}</h2>
+                  <p className="text-sm text-gray-600 mb-4">{userProfile.age} years old</p>
+                  
+                  <div className="w-full space-y-3 mb-4">
+                    <div className="flex items-center space-x-2">
+                      <GraduationCap className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm text-gray-700">{userProfile.college_name}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Book className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm text-gray-700">{userProfile.education}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm text-gray-700">{userProfile.year}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm text-gray-700">
+                        {userProfile.city}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Book className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm text-gray-700">{userProfile.bio}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-gray-700">{userProfile.year}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4 text-indigo-600" />
-                    <span className="text-sm text-gray-700">
-                      {userProfile.city}, {userProfile.state}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="mt-4 w-full">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Hobbies & Interests</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {userProfile.hobbies?.split(", ").map((hobby: string, index: number) => (
-                      <Badge key={index} variant="secondary" className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100">
-                        {hobby}
-                      </Badge>
-                    ))}
+                  <div className="mt-4 w-full">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Hobbies & Interests</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {userProfile.hobbies?.split(", ").map((hobby: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100">
+                          {hobby}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <GradientButton 
-                  onClick={handleEditProfile}
-                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Profile
-                </GradientButton>
-              </div>
-            </Card>
+                  <GradientButton 
+                    onClick={handleEditProfile}
+                    className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Profile
+                  </GradientButton>
+                </div>
+              </Card>
+            )}
 
             {/* Stats and Recent Activity */}
             <div className="md:col-span-2 space-y-6">
@@ -475,7 +510,6 @@ export default function GirlsDashboardPage() {
           </div>
         </div>
       </main>
-      <Footer />
     </div>
   );
 } 

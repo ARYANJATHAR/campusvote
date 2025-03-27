@@ -30,31 +30,7 @@ export function Navbar() {
         </button>
 
         {/* Desktop menu */}
-        <div className="hidden md:flex items-center space-x-8" role="menubar">
-          <a 
-            href="#how-it-works" 
-            className="text-indigo-600 hover:text-purple-600 cursor-pointer font-medium transition-colors duration-300 hover:scale-105"
-            role="menuitem"
-            aria-label="How it works section"
-          >
-            How It Works
-          </a>
-          <a 
-            href="#features" 
-            className="text-indigo-600 hover:text-purple-600 cursor-pointer font-medium transition-colors duration-300 hover:scale-105"
-            role="menuitem"
-            aria-label="Features section"
-          >
-            Features
-          </a>
-          <a 
-            href="#testimonials" 
-            className="text-indigo-600 hover:text-purple-600 cursor-pointer font-medium transition-colors duration-300 hover:scale-105"
-            role="menuitem"
-            aria-label="Testimonials section"
-          >
-            Testimonials
-          </a>
+        <div className="hidden md:flex items-center space-x-4" role="menubar">
           <Link href="/login">
             <GradientButton 
               variant="outline"
@@ -78,27 +54,6 @@ export function Navbar() {
       {/* Mobile menu */}
       <div className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} transition-all duration-300 ease-in-out`}>
         <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t border-gray-100">
-          <a 
-            href="#how-it-works" 
-            className="block px-3 py-2 text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 rounded-md font-medium transition-all duration-300 hover:scale-105"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            <i className="fas fa-info-circle mr-2"></i>How It Works
-          </a>
-          <a 
-            href="#features" 
-            className="block px-3 py-2 text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 rounded-md font-medium transition-all duration-300 hover:scale-105"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            <i className="fas fa-star mr-2"></i>Features
-          </a>
-          <a 
-            href="#testimonials" 
-            className="block px-3 py-2 text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 rounded-md font-medium transition-all duration-300 hover:scale-105"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            <i className="fas fa-comments mr-2"></i>Testimonials
-          </a>
           <Link href="/login" className="block px-3 py-2">
             <GradientButton 
               variant="outline"

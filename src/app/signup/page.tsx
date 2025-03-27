@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase";
 import { X, Eye, EyeOff } from "lucide-react";
 import {
@@ -231,34 +230,34 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-indigo-50 to-purple-50">
       <Navbar />
-      <main className="flex-grow bg-gradient-to-b from-indigo-50 to-purple-50 flex items-center justify-center p-4 pt-20 pb-16">
-        <Card className="w-full max-w-md p-8 shadow-xl">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-2 mb-4">
+      <main className="flex-grow flex items-center justify-center p-4 mt-16 mb-8">
+        <Card className="w-full max-w-md p-6 shadow-xl bg-white/95 backdrop-blur-sm">
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center space-x-2 mb-3">
               <i className="fa-solid fa-heart-pulse text-3xl text-indigo-600"></i>
               <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 CampusVotes
               </span>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">Create Your Account</h1>
-            <p className="text-sm text-gray-600 mt-2">Join the most exciting campus community</p>
+            <p className="text-sm text-gray-600 mt-1">Join the most exciting campus community</p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-600 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-600 rounded-lg text-sm">
               Account created successfully! Redirecting to login page...
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
                 Email Address
@@ -456,7 +455,7 @@ export default function SignupPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{" "}
               <Link href="/login" className="text-indigo-600 hover:text-indigo-500 font-medium">
@@ -466,7 +465,6 @@ export default function SignupPage() {
           </div>
         </Card>
       </main>
-      <Footer />
     </div>
   );
 } 

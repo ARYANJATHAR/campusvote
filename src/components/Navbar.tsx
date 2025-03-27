@@ -104,7 +104,7 @@ export default function Navbar() {
 
         {/* Mobile menu button */}
         <button
-          className="md:hidden p-2 rounded-md text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 transition-all duration-300"
+          className={`md:hidden p-2 rounded-md text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 transition-all duration-300 ${isAuthPage ? 'hidden' : ''}`}
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           aria-label="Toggle menu"
         >
@@ -113,14 +113,7 @@ export default function Navbar() {
 
         {/* Desktop menu */}
         <div className="hidden md:flex items-center space-x-8" role="menubar">
-          {isAuthPage && (
-            <Link href="/">
-              <span className="text-indigo-600 hover:text-purple-600 cursor-pointer font-medium transition-colors duration-300 hover:scale-105">
-                <i className="fas fa-home mr-1"></i>Home
-              </span>
-            </Link>
-          )}
-          {user ? (
+          {!isAuthPage && user ? (
             <>
               <Link href="/dashboard">
                 <span className="text-indigo-600 hover:text-purple-600 cursor-pointer font-medium transition-colors duration-300 hover:scale-105">
@@ -146,6 +139,11 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              <Link href="/">
+                <span className="text-indigo-600 hover:text-purple-600 cursor-pointer font-medium transition-colors duration-300 hover:scale-105">
+                  <i className="fas fa-home mr-1"></i>Home
+                </span>
+              </Link>
               <Link href="/login">
                 <GradientButton 
                   variant="outline"
@@ -171,16 +169,7 @@ export default function Navbar() {
       {/* Mobile menu */}
       <div className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} transition-all duration-300 ease-in-out`}>
         <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t border-gray-100">
-          {isAuthPage && (
-            <Link 
-              href="/"
-              className="block px-3 py-2 text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 rounded-md font-medium transition-all duration-300 hover:scale-105"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <i className="fas fa-home mr-2"></i>Home
-            </Link>
-          )}
-          {user ? (
+          {!isAuthPage && user ? (
             <>
               <Link 
                 href="/dashboard"
@@ -215,6 +204,13 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              <Link 
+                href="/"
+                className="block px-3 py-2 text-indigo-600 hover:text-purple-600 hover:bg-indigo-50 rounded-md font-medium transition-all duration-300 hover:scale-105"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <i className="fas fa-home mr-2"></i>Home
+              </Link>
               <Link 
                 href="/login" 
                 className="block px-3 py-2"

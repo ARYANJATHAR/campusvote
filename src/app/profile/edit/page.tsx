@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { toast } from "sonner";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
@@ -22,7 +21,7 @@ interface ProfileFormData {
   education: string;
   year: string;
   city: string;
-  state: string;
+  bio: string;
   hobbies: string;
   profile_image: string | null;
 }
@@ -39,7 +38,7 @@ export default function EditProfile() {
     education: "",
     year: "",
     city: "",
-    state: "",
+    bio: "",
     hobbies: "",
     profile_image: null
   });
@@ -69,7 +68,7 @@ export default function EditProfile() {
             education: profile.education || "",
             year: profile.year || "",
             city: profile.city || "",
-            state: profile.state || "",
+            bio: profile.bio || "",
             hobbies: profile.hobbies || "",
             profile_image: profile.profile_image
           });
@@ -119,9 +118,10 @@ export default function EditProfile() {
         return;
       }
 
-      // Upload image
+      // Upload image with a more unique filename to prevent collisions
       const fileExt = file.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
+      const timestamp = new Date().getTime();
+      const fileName = `${session.user.id}-${timestamp}-${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
 
       // Upload directly to the profiles bucket without checking existence
       const { data, error } = await supabase.storage
@@ -137,14 +137,17 @@ export default function EditProfile() {
         return;
       }
 
-      // Get public URL
+      // Get public URL with cache busting parameter
       const { data: { publicUrl } } = supabase.storage
         .from('profiles')
         .getPublicUrl(fileName);
 
+      // Add cache busting parameter
+      const cacheBustUrl = `${publicUrl}?t=${timestamp}`;
+
       setFormData(prev => ({
         ...prev,
-        profile_image: publicUrl
+        profile_image: cacheBustUrl
       }));
 
       toast.success("Profile image uploaded successfully");
@@ -165,9 +168,18 @@ export default function EditProfile() {
         return;
       }
 
+      // Add timestamp to profile image URL to bust cache if it exists
+      const updatedFormData = {...formData};
+      if (updatedFormData.profile_image) {
+        // Add a timestamp query parameter to bust cache
+        const timestamp = new Date().getTime();
+        const separator = updatedFormData.profile_image.includes('?') ? '&' : '?';
+        updatedFormData.profile_image = `${updatedFormData.profile_image}${separator}t=${timestamp}`;
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update(formData)
+        .update(updatedFormData)
         .eq("id", session.user.id);
 
       if (error) throw error;
@@ -223,6 +235,7 @@ export default function EditProfile() {
                         src={formData.profile_image}
                         alt="Profile"
                         className="w-24 h-24 rounded-full object-cover ring-2 ring-indigo-100 transition-transform duration-300 hover:scale-105"
+                        key={formData.profile_image}
                       />
                       <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 shadow-md">
                         <Upload className="w-4 h-4 text-indigo-600" />
@@ -326,14 +339,15 @@ export default function EditProfile() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="state" className="text-gray-700">State</Label>
-                  <Input
-                    id="state"
-                    name="state"
-                    value={formData.state}
+                  <Label htmlFor="bio" className="text-gray-700">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio}
                     onChange={handleChange}
+                    placeholder="Tell us about yourself..."
                     required
-                    className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
+                    className="border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200 min-h-[100px]"
                   />
                 </div>
               </div>
@@ -375,7 +389,6 @@ export default function EditProfile() {
           </Card>
         </div>
       </main>
-      <Footer />
     </div>
   );
 } 
