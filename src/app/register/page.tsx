@@ -40,6 +40,8 @@ export default function RegisterPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+  const [imageError, setImageError] = useState("");
 
   useEffect(() => {
     const getUserGender = async () => {
@@ -51,6 +53,29 @@ export default function RegisterPage() {
     getUserGender();
   }, [supabase.auth]);
 
+  const validateAge = (age: string) => {
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum)) return "Please enter a valid age";
+    if (ageNum < 18) return "You must be at least 18 years old";
+    if (ageNum > 30) return "Age must be 30 or less";
+    return "";
+  };
+
+  const validateImage = (file: File) => {
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      return "Image size must be less than 5MB";
+    }
+
+    // Check file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      return "Only JPEG, PNG, and JPG images are allowed";
+    }
+
+    return "";
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -58,11 +83,26 @@ export default function RegisterPage() {
       [name]: value,
     }));
     setError("");
+    setFieldErrors(prev => ({ ...prev, [name]: "" }));
+
+    // Validate age as user types
+    if (name === "age") {
+      const ageError = validateAge(value);
+      if (ageError) {
+        setFieldErrors(prev => ({ ...prev, age: ageError }));
+      }
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const imageError = validateImage(file);
+      if (imageError) {
+        setImageError(imageError);
+        return;
+      }
+      setImageError("");
       setFormData((prev) => ({
         ...prev,
         profileImage: file,
@@ -75,10 +115,39 @@ export default function RegisterPage() {
     }
   };
 
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+    
+    // Check required fields
+    if (!formData.name.trim()) errors.name = "Name is required";
+    if (!formData.age) errors.age = "Age is required";
+    if (!formData.collegeName.trim()) errors.collegeName = "College name is required";
+    if (!formData.education) errors.education = "Education level is required";
+    if (!formData.year) errors.year = "Current year is required";
+    if (!formData.city.trim()) errors.city = "City is required";
+    if (!formData.state.trim()) errors.state = "State is required";
+    if (!formData.hobbies.trim()) errors.hobbies = "Hobbies are required";
+    if (!formData.profileImage) errors.profileImage = "Profile image is required";
+
+    // Validate age if provided
+    if (formData.age) {
+      const ageError = validateAge(formData.age);
+      if (ageError) errors.age = ageError;
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
 
     try {
       // Get the current user's session
@@ -213,13 +282,19 @@ export default function RegisterPage() {
                   type="file"
                   id="profileImage"
                   name="profileImage"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/jpg"
                   onChange={handleImageChange}
                   className="hidden"
                   required
                 />
               </div>
-              <p className="text-sm text-gray-500">Upload your profile picture (max 5MB)</p>
+              <p className="text-sm text-gray-500">Upload your profile picture (max 5MB, JPEG/PNG/JPG)</p>
+              {imageError && (
+                <p className="text-sm text-red-500 mt-1">{imageError}</p>
+              )}
+              {fieldErrors.profileImage && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.profileImage}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -234,25 +309,37 @@ export default function RegisterPage() {
                   placeholder="Enter your full name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
+                  className={`w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200 ${
+                    fieldErrors.name ? "border-red-500" : ""
+                  }`}
                   required
                 />
+                {fieldErrors.name && (
+                  <p className="text-sm text-red-500 mt-1">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="age" className="text-sm font-medium text-gray-700">
-                  Age
+                  Age (18-30)
                 </label>
                 <Input
                   id="age"
                   name="age"
                   type="number"
+                  min="18"
+                  max="30"
                   placeholder="Enter your age"
                   value={formData.age}
                   onChange={handleChange}
-                  className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200"
+                  className={`w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200 ${
+                    fieldErrors.age ? "border-red-500" : ""
+                  }`}
                   required
                 />
+                {fieldErrors.age && (
+                  <p className="text-sm text-red-500 mt-1">{fieldErrors.age}</p>
+                )}
               </div>
 
               <div className="space-y-2">

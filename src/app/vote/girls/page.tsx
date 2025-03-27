@@ -194,7 +194,7 @@ export default function GirlsVotePage() {
               {currentPair.map((profile) => (
                 <Card 
                   key={profile.id} 
-                  className="w-full p-4 bg-white/80 backdrop-blur-md border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+                  className="w-full p-4 bg-white/80 border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
                 >
                   <div className="flex flex-col gap-4">
                     <div className="relative aspect-[4/3] rounded-xl overflow-hidden ring-2 ring-indigo-100">

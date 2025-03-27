@@ -202,10 +202,10 @@ export default function SignupPage() {
 
       // Show success message
       setSuccess(true);
-      // Redirect to login page after 2 seconds
+      // Redirect to login page after 3 seconds to ensure the success message is visible
       setTimeout(() => {
         router.push("/login");
-      }, 2000);
+      }, 3000);
     } catch (err) {
       console.error("Signup error:", err);
       setError(err instanceof Error ? err.message : "An error occurred during signup");
