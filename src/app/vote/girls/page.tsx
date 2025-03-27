@@ -19,6 +19,7 @@ export default function GirlsVotePage() {
   const [currentPair, setCurrentPair] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewedProfiles, setViewedProfiles] = useState<string[]>([]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -38,20 +39,27 @@ export default function GirlsVotePage() {
 
     const fetchProfiles = async () => {
       try {
-        // Fetch male profiles for female users
+        // Fetch all male profiles for female users
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('gender', 'male');
 
         if (error) throw error;
-        setProfiles(data || []);
+        
+        // Shuffle the profiles
+        const shuffledProfiles = shuffleArray(data || []);
+        setProfiles(shuffledProfiles);
+        
         // Set initial pair
-        if (data && data.length >= 2) {
-          setCurrentPair([data[0], data[1]]);
+        if (shuffledProfiles.length >= 2) {
+          const initialPair = [shuffledProfiles[0], shuffledProfiles[1]];
+          setCurrentPair(initialPair);
+          setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
         }
       } catch (error) {
         console.error('Error fetching profiles:', error);
+        setError('Failed to fetch profiles. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -61,15 +69,71 @@ export default function GirlsVotePage() {
     fetchProfiles();
   }, [supabase, router]);
 
+  // Fisher-Yates shuffle algorithm for randomizing profiles
+  const shuffleArray = (array: any[]) => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  };
+
   const getNextPair = () => {
+    // If all profiles have been viewed, reset the viewed profiles
+    if (viewedProfiles.length >= profiles.length) {
+      setViewedProfiles([]);
+      const reshuffledProfiles = shuffleArray(profiles);
+      setProfiles(reshuffledProfiles);
+      
+      if (reshuffledProfiles.length >= 2) {
+        setCurrentPair([reshuffledProfiles[0], reshuffledProfiles[1]]);
+        setViewedProfiles([reshuffledProfiles[0].id, reshuffledProfiles[1].id]);
+      } else {
+        setCurrentPair([]);
+      }
+      return;
+    }
+
+    // Get profiles that haven't been viewed yet
     const remainingProfiles = profiles.filter(
-      profile => !currentPair.some(p => p.id === profile.id)
+      profile => !viewedProfiles.includes(profile.id)
     );
     
     if (remainingProfiles.length >= 2) {
-      setCurrentPair([remainingProfiles[0], remainingProfiles[1]]);
+      const nextPair = [remainingProfiles[0], remainingProfiles[1]];
+      setCurrentPair(nextPair);
+      setViewedProfiles([...viewedProfiles, remainingProfiles[0].id, remainingProfiles[1].id]);
+    } else if (remainingProfiles.length === 1) {
+      // Find a profile that hasn't been shown recently (at least 2 sets ago)
+      const olderViewedProfiles = viewedProfiles.slice(0, viewedProfiles.length - 4);
+      if (olderViewedProfiles.length > 0) {
+        // Randomly select one of the older viewed profiles
+        const randomIndex = Math.floor(Math.random() * olderViewedProfiles.length);
+        const randomOldProfileId = olderViewedProfiles[randomIndex];
+        const randomOldProfile = profiles.find(p => p.id === randomOldProfileId);
+        
+        if (randomOldProfile) {
+          setCurrentPair([remainingProfiles[0], randomOldProfile]);
+          setViewedProfiles([...viewedProfiles, remainingProfiles[0].id]);
+        } else {
+          setCurrentPair([]);
+        }
+      } else {
+        setCurrentPair([]);
+      }
     } else {
-      setCurrentPair([]);
+      // Reset and start over with reshuffled profiles
+      const reshuffledProfiles = shuffleArray(profiles);
+      setProfiles(reshuffledProfiles);
+      setViewedProfiles([]);
+      
+      if (reshuffledProfiles.length >= 2) {
+        setCurrentPair([reshuffledProfiles[0], reshuffledProfiles[1]]);
+        setViewedProfiles([reshuffledProfiles[0].id, reshuffledProfiles[1].id]);
+      } else {
+        setCurrentPair([]);
+      }
     }
   };
 
@@ -146,7 +210,7 @@ export default function GirlsVotePage() {
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow bg-gradient-to-b from-indigo-50 to-purple-50 flex items-center justify-center p-4 pt-24">
-          <div className="w-full max-w-5xl text-center bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100">
+          <div className="w-full max-w-5xl text-center bg-white/80 rounded-2xl shadow-xl p-8 border border-gray-100">
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">Error Loading Profiles</h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <GradientButton
@@ -178,7 +242,7 @@ export default function GirlsVotePage() {
           </div>
 
           {currentPair.length === 0 ? (
-            <div className="text-center py-12 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100">
+            <div className="text-center py-12 bg-white/80 rounded-2xl shadow-xl p-8 border border-gray-100">
               <h2 className="text-2xl font-semibold text-gray-800 mb-4">No more profiles to vote!</h2>
               <p className="text-gray-600 mb-6">Check back later for more profiles to vote on.</p>
               <GradientButton
