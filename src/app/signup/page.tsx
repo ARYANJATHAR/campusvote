@@ -413,7 +413,7 @@ export default function SignupPage() {
               </label>
               <Select
                 value={formData.gender}
-                onValueChange={(value) =>
+                onValueChange={(value: string) =>
                   setFormData((prev) => ({ ...prev, gender: value }))
                 }
               >
@@ -425,25 +425,6 @@ export default function SignupPage() {
                   <SelectItem value="female">Female</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="terms"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                required
-              />
-              <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-                I agree to the{" "}
-                <Link href="/terms" className="text-indigo-600 hover:text-indigo-500">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" className="text-indigo-600 hover:text-indigo-500">
-                  Privacy Policy
-                </Link>
-              </label>
             </div>
 
             <Button

@@ -36,14 +36,39 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  // Only protect dashboard routes
-  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Define protected routes
+  const protectedRoutes = ['/dashboard', '/profile', '/vote']
+  const isProtectedRoute = protectedRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  )
+
+  // Define auth routes (login, signup)
+  const authRoutes = ['/login', '/signup', '/register']
+  const isAuthRoute = authRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  )
+
+  // Redirect logic
+  if (isProtectedRoute && !session) {
+    // Redirect to login if trying to access protected route without session
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (isAuthRoute && session) {
+    // Redirect to dashboard if trying to access auth routes with active session
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return response
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'], // Only protect dashboard routes
+  matcher: [
+    '/dashboard/:path*',
+    '/profile/:path*',
+    '/vote/:path*',
+    '/login/:path*',
+    '/signup/:path*',
+    '/register/:path*',
+  ],
 } 

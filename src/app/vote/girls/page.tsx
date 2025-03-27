@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
+import Image from "next/image";
 
 export default function GirlsVotePage() {
   const supabase = createClient();
@@ -17,10 +18,17 @@ export default function GirlsVotePage() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [currentPair, setCurrentPair] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imageLoading, setImageLoading] = useState<{[key: string]: boolean}>({});
+  const [imagesReady, setImagesReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewedProfiles, setViewedProfiles] = useState<string[]>([]);
   const [viewedPairs, setViewedPairs] = useState<Set<string>>(new Set());
   const [allPairsViewed, setAllPairsViewed] = useState(false);
+  const [nextPair, setNextPair] = useState<any[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
+  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -54,6 +62,31 @@ export default function GirlsVotePage() {
     return newArray;
   };
 
+  // Optimized image preloading
+  const preloadImages = useCallback((profiles: any[]) => {
+    profiles.forEach(profile => {
+      if (profile.profile_image && !preloadedImages.has(profile.profile_image)) {
+        const img = new window.Image();
+        img.src = profile.profile_image;
+        setPreloadedImages(prev => new Set([...prev, profile.profile_image]));
+      }
+    });
+  }, [preloadedImages]);
+
+  // Preload next batch of images
+  const preloadNextBatch = useCallback(() => {
+    if (profiles.length < 2) return;
+
+    // Get next 4 profiles that haven't been viewed
+    const remainingProfiles = profiles.filter(profile => 
+      !viewedProfiles.includes(profile.id)
+    ).slice(0, 4);
+
+    if (remainingProfiles.length > 0) {
+      preloadImages(remainingProfiles);
+    }
+  }, [profiles, viewedProfiles, preloadImages]);
+
   const fetchProfiles = useCallback(async () => {
     try {
       // Fetch all male profiles for female users
@@ -75,6 +108,10 @@ export default function GirlsVotePage() {
         setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
         // Add this pair to viewed pairs
         setViewedPairs(new Set([`${shuffledProfiles[0].id}-${shuffledProfiles[1].id}`]));
+        
+        // Preload initial pair images and next batch
+        preloadImages(initialPair);
+        preloadNextBatch();
       }
     } catch (error) {
       console.error('Error fetching profiles:', error);
@@ -82,7 +119,7 @@ export default function GirlsVotePage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, preloadImages, preloadNextBatch]);
 
   const getNextPair = () => {
     // Check if all possible pairs have been viewed
@@ -130,6 +167,14 @@ export default function GirlsVotePage() {
     }
   };
 
+  const handleProfileClick = async (profile: any) => {
+    if (isVoting) return; // Prevent multiple votes while processing
+    setIsVoting(true);
+    
+    // Removed loading toast
+    await handleVote(profile.id);
+  };
+
   const handleVote = async (profileId: string) => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -174,20 +219,89 @@ export default function GirlsVotePage() {
         return;
       }
 
-      // Show success toast
-      toast.success('Vote recorded!', {
-        duration: 2000
+      // Clear any existing toasts first
+      toast.dismiss();
+      
+      // Show only one success toast with shorter duration
+      toast.success('Vote recorded successfully!', {
+        duration: 1000, // 1 second duration
+        className: 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold',
       });
 
-      // Get next pair after 1 second
-      setTimeout(() => {
-        getNextPair();
-      }, 1000);
+      // Get next pair after voting is complete (removed setTimeout)
+      getNextPair();
 
     } catch (error) {
       console.error('Error recording vote:', error);
       toast.error(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      setIsVoting(false);
     }
+  };
+
+  const preloadNextPair = useCallback(() => {
+    if (profiles.length < 2) return;
+
+    // Find next unviewed pair
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    while (attempts < maxAttempts) {
+      attempts++;
+      const remainingProfiles = shuffleArray([...profiles]);
+      
+      if (remainingProfiles.length < 2) break;
+      
+      const profile1 = remainingProfiles[0];
+      const profile2 = remainingProfiles[1];
+      const pairIds = [profile1.id, profile2.id].sort();
+      const pairKey = `${pairIds[0]}-${pairIds[1]}`;
+      
+      if (!viewedPairs.has(pairKey)) {
+        setNextPair([profile1, profile2]);
+        // Preload images
+        [profile1, profile2].forEach(profile => {
+          if (profile.profile_image) {
+            const img = new window.Image();
+            img.src = profile.profile_image;
+          }
+        });
+        break;
+      }
+    }
+  }, [profiles, viewedPairs]);
+
+  useEffect(() => {
+    if (currentPair.length === 2) {
+      // Reset image loading state when current pair changes
+      setImagesReady(false);
+      setImageLoading({
+        [currentPair[0].id]: true,
+        [currentPair[1].id]: true
+      });
+      
+      // Preload next batch of images
+      preloadNextBatch();
+    }
+  }, [currentPair, preloadNextBatch]);
+
+  const handleImageLoad = (profileId: string) => {
+    setImageLoading(prev => {
+      const newState = {
+        ...prev,
+        [profileId]: false
+      };
+      
+      // Check if all images in the current pair are loaded
+      if (currentPair.length === 2 && 
+          !newState[currentPair[0].id] && 
+          !newState[currentPair[1].id]) {
+        // Small delay to ensure smooth transition
+        setTimeout(() => setImagesReady(true), 100);
+      }
+      
+      return newState;
+    });
   };
 
   if (loading) {
@@ -230,7 +344,7 @@ export default function GirlsVotePage() {
                 Vote for Your Favorite
               </GradientText>
             </h1>
-            <p className="text-gray-600">Click to vote for your favorite profile</p>
+            <p className="text-gray-600">Click on the profile to vote</p>
           </div>
 
           {currentPair.length === 0 ? (
@@ -254,14 +368,26 @@ export default function GirlsVotePage() {
               {currentPair.map((profile) => (
                 <Card 
                   key={profile.id} 
-                  className="w-full p-4 bg-white/80 border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+                  className="w-full p-4 bg-white/80 border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                  onClick={() => handleProfileClick(profile)}
                 >
                   <div className="flex flex-col gap-4">
                     <div className="relative aspect-[4/3] rounded-xl overflow-hidden ring-2 ring-indigo-100">
-                      <img
+                      <div className={`absolute inset-0 bg-gray-100 animate-pulse ${!imageLoading[profile.id] ? 'hidden' : ''}`} />
+                      <Image
                         src={profile.profile_image || '/default-avatar.png'}
                         alt={profile.name}
-                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                        fill
+                        quality={85}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className={`object-cover transition-transform duration-300 hover:scale-105 ${
+                          imagesReady ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        priority={true}
+                        onLoad={() => handleImageLoad(profile.id)}
+                        loading="eager"
+                        placeholder="blur"
+                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4dHRsdHR4dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR3/2wBDAR4WFiMeJR4lHR0lLiUdHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR3/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                       />
                     </div>
 
@@ -304,7 +430,7 @@ export default function GirlsVotePage() {
                       </div>
 
                       <GradientButton
-                        onClick={() => handleVote(profile.id)}
+                        onClick={() => handleProfileClick(profile)}
                         className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
                       >
                         <i className="fa-solid fa-heart mr-2"></i> Vote
