@@ -59,12 +59,13 @@ export default function Leaderboard() {
   const getLeaderboardData = async () => {
     try {
       setIsRefreshing(true);
+      setLoading(true);
       console.log('Fetching fresh leaderboard data...');
       const { data: profiles, error } = await supabase
         .from("profiles")
         .select("id, name, profile_image, votes, gender")
         .order("votes", { ascending: false })
-        .limit(20)  // Increased limit to show more profiles
+        .limit(20)
         .throwOnError();
 
       if (error) {
@@ -84,6 +85,10 @@ export default function Leaderboard() {
       setLoading(false);
       setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await getLeaderboardData();
   };
 
   useEffect(() => {
@@ -181,7 +186,7 @@ export default function Leaderboard() {
                   </button>
                 </div>
                 <button
-                  onClick={() => getLeaderboardData()}
+                  onClick={handleRefresh}
                   disabled={isRefreshing}
                   className={`bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all duration-300 flex items-center gap-2 ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
