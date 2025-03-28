@@ -25,7 +25,7 @@ import Link from "next/link";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { calculateUserRank, subscribeToRankUpdates } from "@/lib/utils";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface Profile {
   id: string;
