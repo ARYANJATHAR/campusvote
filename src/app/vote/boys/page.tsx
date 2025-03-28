@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { GradientText } from "@/components/landing/GradientText";

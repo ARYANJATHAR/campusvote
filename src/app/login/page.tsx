@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {

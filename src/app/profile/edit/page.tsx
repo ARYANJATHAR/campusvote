@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-client";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";

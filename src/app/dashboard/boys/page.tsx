@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-client";
 import { 
   Trophy, 
   Heart, 

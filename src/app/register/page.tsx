@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-client";
 import { Label } from "@/components/ui/label";
 
 interface ProfileFormData {
@@ -216,8 +216,7 @@ export default function RegisterPage() {
           votes: 0, // Initialize votes to 0
           updated_at: new Date().toISOString(),
         }, {
-          onConflict: 'id',
-          returning: true // Add this to get the updated data back
+          onConflict: 'id'
         });
 
       if (updateError) {

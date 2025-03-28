@@ -1,12 +1,13 @@
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name } = await request.json()
+    const { email, password, gender } = await request.json()
+    const supabase = createServerSupabaseClient()
 
     // Validate input
-    if (!email || !password || !name) {
+    if (!email || !password || !gender) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
       password,
       options: {
         data: {
-          name,
+          gender,
         },
       },
     })

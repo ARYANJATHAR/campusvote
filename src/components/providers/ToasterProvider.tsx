@@ -10,10 +10,8 @@ export function ToasterProvider() {
       richColors
       closeButton
       theme="light"
-      pauseWhenPageIsHidden
       toastOptions={{
         duration: 1000,
-        dismissible: true,
         closeButton: true,
         className: "bg-white border border-gray-200 shadow-lg",
         classNames: {
