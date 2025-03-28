@@ -134,7 +134,8 @@ export default function RegisterPage() {
       toast.error("Name is required");
       return false;
     }
-    if (!formData.age || formData.age < 16 || formData.age > 25) {
+    const ageNum = parseInt(formData.age);
+    if (!formData.age || isNaN(ageNum) || ageNum < 16 || ageNum > 25) {
       setError("Age must be between 16 and 25");
       toast.error("Age must be between 16 and 25");
       return false;
