@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,7 +21,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,13 +61,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient(rememberMe);
+      const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password
       });
 
       if (error) {
+        toast.error(error.message);
         throw error;
       }
 
@@ -81,11 +82,14 @@ export default function LoginPage() {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
+          toast.error("Profile not found. Redirecting to registration...");
           // If profile doesn't exist, redirect to register
           router.push("/register");
           return;
         }
 
+        toast.success("Login successful!");
+        
         // If profile exists, get user's gender and redirect to appropriate vote page
         const userGender = data.user.user_metadata?.gender;
         if (userGender === 'male') {
@@ -101,6 +105,7 @@ export default function LoginPage() {
     } catch (err) {
       console.error("Login error:", err);
       setError(err instanceof Error ? err.message : "An error occurred during login");
+      toast.error(err instanceof Error ? err.message : "An error occurred during login");
     } finally {
       setLoading(false);
     }
@@ -203,41 +208,21 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="remember"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
-                  Remember me
-                </label>
-              </div>
-              <Link href="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-500">
-                Forgot password?
-              </Link>
-            </div>
-
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white text-sm py-3 shadow-lg hover:shadow-xl transition-all duration-300"
-              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition-colors duration-200"
+              disabled={loading || !!emailError}
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? "Signing in..." : "Sign in"}
             </Button>
-          </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{" "}
-              <Link href="/signup" className="text-indigo-600 hover:text-indigo-500 font-medium">
+            <div className="text-center text-sm">
+              <span className="text-gray-600">Don't have an account? </span>
+              <Link href="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
                 Sign up
               </Link>
-            </p>
-          </div>
+            </div>
+          </form>
         </Card>
       </main>
     </div>

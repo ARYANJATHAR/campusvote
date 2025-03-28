@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase-client";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface ProfileFormData {
   name: string;
@@ -128,27 +129,37 @@ export default function RegisterPage() {
   };
 
   const validateForm = () => {
-    const errors: { [key: string]: string } = {};
-    
-    // Check required fields
-    if (!formData.name.trim()) errors.name = "Name is required";
-    if (!formData.age) errors.age = "Age is required";
-    if (!formData.collegeName.trim()) errors.collegeName = "College name is required";
-    if (!formData.education) errors.education = "Education level is required";
-    if (!formData.year) errors.year = "Current year is required";
-    if (!formData.city.trim()) errors.city = "City is required";
-    if (!formData.hobbies.trim()) errors.hobbies = "Hobbies are required";
-    if (!formData.bio.trim()) errors.bio = "Bio is required";
-    if (!formData.profileImage) errors.profileImage = "Profile image is required";
-
-    // Validate age if provided
-    if (formData.age) {
-      const ageError = validateAge(formData.age);
-      if (ageError) errors.age = ageError;
+    if (!formData.name.trim()) {
+      setError("Name is required");
+      toast.error("Name is required");
+      return false;
     }
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    if (!formData.age || formData.age < 16 || formData.age > 25) {
+      setError("Age must be between 16 and 25");
+      toast.error("Age must be between 16 and 25");
+      return false;
+    }
+    if (!formData.collegeName.trim()) {
+      setError("College name is required");
+      toast.error("College name is required");
+      return false;
+    }
+    if (!formData.education.trim()) {
+      setError("Education is required");
+      toast.error("Education is required");
+      return false;
+    }
+    if (!formData.year) {
+      setError("Year is required");
+      toast.error("Year is required");
+      return false;
+    }
+    if (!formData.city.trim()) {
+      setError("City is required");
+      toast.error("City is required");
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,8 +176,12 @@ export default function RegisterPage() {
       // Get the current user's session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        toast.error("Authentication error: " + sessionError.message);
+        throw sessionError;
+      }
       if (!session?.user) {
+        toast.error("No user session found. Please log in again.");
         throw new Error('No user session found');
       }
 
@@ -184,6 +199,7 @@ export default function RegisterPage() {
 
           if (uploadError) {
             console.error('Upload error:', uploadError);
+            toast.error("Failed to upload profile image: " + uploadError.message);
             throw new Error('Failed to upload profile image');
           }
 
@@ -192,8 +208,10 @@ export default function RegisterPage() {
             .getPublicUrl(filePath);
 
           profileImageUrl = publicUrl;
+          toast.success("Profile image uploaded successfully!");
         } catch (uploadErr) {
           console.error('Image upload error:', uploadErr);
+          toast.error("Failed to upload image. Continuing without profile image.");
           // Continue without the image if upload fails
         }
       }
@@ -225,14 +243,18 @@ export default function RegisterPage() {
           details: updateError.details,
           hint: updateError.hint
         });
+        toast.error(`Failed to update profile: ${updateError.message}`);
         throw new Error(`Failed to update profile: ${updateError.message}`);
       }
+
+      toast.success("Profile created successfully!");
 
       // Get user's gender from metadata
       const gender = session.user.user_metadata?.gender;
       console.log('User gender:', gender);
 
       if (!gender) {
+        toast.error("Gender not found in user metadata");
         throw new Error('Gender not found in user metadata');
       }
 
@@ -244,11 +266,14 @@ export default function RegisterPage() {
         console.log('Redirecting to girls vote page...');
         router.push('/vote/girls');
       } else {
+        toast.error("Invalid gender value");
         throw new Error('Invalid gender value');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during registration');
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during registration';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

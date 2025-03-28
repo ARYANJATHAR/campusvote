@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -166,6 +167,7 @@ export default function SignupPage() {
     // Validate password length
     if (formData.password.length < 6) {
       setError("Password must be at least 6 characters long");
+      toast.error("Password must be at least 6 characters long");
       setLoading(false);
       return;
     }
@@ -173,6 +175,7 @@ export default function SignupPage() {
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
+      toast.error("Passwords do not match");
       setLoading(false);
       return;
     }
@@ -180,6 +183,7 @@ export default function SignupPage() {
     // Validate email before submission
     if (!validateEmail(formData.email)) {
       setError("Please enter a valid email address");
+      toast.error("Please enter a valid email address");
       setLoading(false);
       return;
     }
@@ -196,18 +200,22 @@ export default function SignupPage() {
       });
 
       if (error) {
+        toast.error(error.message);
         throw error;
       }
 
       // Show success message
       setSuccess(true);
+      toast.success("Account created successfully! Redirecting to login page...");
       // Redirect to login page after 3 seconds to ensure the success message is visible
       setTimeout(() => {
         router.push("/login");
       }, 3000);
     } catch (err) {
       console.error("Signup error:", err);
-      setError(err instanceof Error ? err.message : "An error occurred during signup");
+      const errorMessage = err instanceof Error ? err.message : "An error occurred during signup";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
