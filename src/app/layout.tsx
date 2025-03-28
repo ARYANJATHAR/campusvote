@@ -3,6 +3,7 @@ import { Poppins, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import dynamic from 'next/dynamic';
+import { Analytics } from "@vercel/analytics/react"
 
 // Dynamically import Toaster with client-side only rendering
 const ToasterProvider = dynamic(
@@ -82,6 +83,7 @@ export default function RootLayout({
       <body className={`${poppins.variable} ${robotoMono.variable} font-sans antialiased`}>
         {children}
         <ToasterProvider />
+        <Analytics />
       </body>
     </html>
   );
