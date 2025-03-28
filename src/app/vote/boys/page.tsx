@@ -12,6 +12,8 @@ import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
 import Image from "next/image";
 
+export const dynamic = 'force-dynamic';
+
 export default function BoysVotePage() {
   const supabase = createClient();
   const router = useRouter();
