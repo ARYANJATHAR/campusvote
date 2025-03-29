@@ -22,6 +22,20 @@ export default function Navbar() {
   const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/register';
 
   useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (isAuthenticated) {
+        await supabase.auth.signOut();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isAuthenticated, supabase.auth]);
+
+  useEffect(() => {
     const getUserSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setIsAuthenticated(!!session);

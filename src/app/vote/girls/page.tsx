@@ -43,7 +43,7 @@ export default function GirlsVotePage() {
       // Check if user is female
       const userGender = session.user.user_metadata?.gender;
       if (userGender !== 'female') {
-        router.push('/dashboard');
+        router.push('/register');
         return;
       }
 

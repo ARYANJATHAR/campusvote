@@ -82,7 +82,7 @@ export default function LoginPage() {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
-          toast.error("Profile not found. Redirecting to registration...");
+          toast.info("Please complete your registration to continue");
           // If profile doesn't exist, redirect to register
           router.push("/register");
           return;

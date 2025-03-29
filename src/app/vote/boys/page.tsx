@@ -82,7 +82,7 @@ export default function BoysVotePage() {
       // Check if user is male
       const userGender = session.user.user_metadata?.gender;
       if (userGender !== 'male') {
-        router.push('/dashboard');
+        router.push('/register');
         return;
       }
 

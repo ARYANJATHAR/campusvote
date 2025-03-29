@@ -48,14 +48,31 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   )
 
+  // Check if user has completed registration
+  let hasProfile = false;
+  if (session?.user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+    hasProfile = !!profile;
+  }
+
   // Redirect logic
   if (isProtectedRoute && !session) {
     // Redirect to login if trying to access protected route without session
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (isAuthRoute && session) {
-    // Redirect to dashboard if trying to access auth routes with active session
+  // If user is logged in but hasn't completed registration
+  if (session && !hasProfile && !request.nextUrl.pathname.startsWith('/register')) {
+    // Allow access to logout but redirect other requests to register
+    return NextResponse.redirect(new URL('/register', request.url))
+  }
+
+  // Don't allow authenticated users with profiles to access auth routes
+  if (isAuthRoute && session && hasProfile) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

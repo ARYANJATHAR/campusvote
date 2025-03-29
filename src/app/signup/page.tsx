@@ -204,13 +204,15 @@ export default function SignupPage() {
         throw error;
       }
 
-      // Show success message
+      // Show success message and redirect to login
       setSuccess(true);
-      toast.success("Account created successfully! Redirecting to login page...");
-      // Redirect to login page after 3 seconds to ensure the success message is visible
-      setTimeout(() => {
-        router.push("/login");
-      }, 3000);
+      toast.success("Account created successfully! Please login to continue.");
+      
+      // Sign out the user to ensure they need to login again
+      await supabase.auth.signOut();
+      
+      // Redirect to login page
+      router.push("/login");
     } catch (err) {
       console.error("Signup error:", err);
       const errorMessage = err instanceof Error ? err.message : "An error occurred during signup";
