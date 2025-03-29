@@ -68,7 +68,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-        toast.error(error.message);
+        setError(error.message);
         throw error;
       }
 
@@ -82,13 +82,11 @@ export default function LoginPage() {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
-          toast.info("Please complete your registration to continue");
+          setError("Please complete your registration to continue");
           // If profile doesn't exist, redirect to register
           router.push("/register");
           return;
         }
-
-        toast.success("Login successful!");
         
         // If profile exists, get user's gender and redirect to appropriate vote page
         const userGender = data.user.user_metadata?.gender;
@@ -105,7 +103,6 @@ export default function LoginPage() {
     } catch (err) {
       console.error("Login error:", err);
       setError(err instanceof Error ? err.message : "An error occurred during login");
-      toast.error(err instanceof Error ? err.message : "An error occurred during login");
     } finally {
       setLoading(false);
     }

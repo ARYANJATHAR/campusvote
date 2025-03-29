@@ -167,7 +167,6 @@ export default function SignupPage() {
     // Validate password length
     if (formData.password.length < 6) {
       setError("Password must be at least 6 characters long");
-      toast.error("Password must be at least 6 characters long");
       setLoading(false);
       return;
     }
@@ -175,7 +174,6 @@ export default function SignupPage() {
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
-      toast.error("Passwords do not match");
       setLoading(false);
       return;
     }
@@ -183,7 +181,6 @@ export default function SignupPage() {
     // Validate email before submission
     if (!validateEmail(formData.email)) {
       setError("Please enter a valid email address");
-      toast.error("Please enter a valid email address");
       setLoading(false);
       return;
     }
@@ -200,13 +197,12 @@ export default function SignupPage() {
       });
 
       if (error) {
-        toast.error(error.message);
+        setError(error.message);
         throw error;
       }
 
       // Show success message and redirect to login
       setSuccess(true);
-      toast.success("Account created successfully! Please login to continue.");
       
       // Sign out the user to ensure they need to login again
       await supabase.auth.signOut();
@@ -217,7 +213,6 @@ export default function SignupPage() {
       console.error("Signup error:", err);
       const errorMessage = err instanceof Error ? err.message : "An error occurred during signup";
       setError(errorMessage);
-      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

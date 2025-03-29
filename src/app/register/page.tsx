@@ -131,65 +131,64 @@ export default function RegisterPage() {
   const validateForm = () => {
     if (!formData.name.trim()) {
       setError("Name is required");
-      toast.error("Name is required");
       return false;
     }
     const ageNum = parseInt(formData.age);
     if (!formData.age || isNaN(ageNum) || ageNum < 16 || ageNum > 25) {
       setError("Age must be between 16 and 25");
-      toast.error("Age must be between 16 and 25");
       return false;
     }
     if (!formData.collegeName.trim()) {
       setError("College name is required");
-      toast.error("College name is required");
       return false;
     }
     if (!formData.education.trim()) {
       setError("Education is required");
-      toast.error("Education is required");
       return false;
     }
     if (!formData.year) {
       setError("Year is required");
-      toast.error("Year is required");
       return false;
     }
     if (!formData.city.trim()) {
       setError("City is required");
-      toast.error("City is required");
       return false;
     }
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('Form submission started');
     e.preventDefault();
+    e.stopPropagation();
     setError("");
     setLoading(true);
 
     if (!validateForm()) {
+      console.log('Form validation failed');
       setLoading(false);
       return;
     }
 
     try {
-      // Get the current user's session
+      console.log('Attempting to get user session');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
-        toast.error("Authentication error: " + sessionError.message);
+        console.error('Session error:', sessionError);
+        setError("Authentication error: " + sessionError.message);
         throw sessionError;
       }
       if (!session?.user) {
-        toast.error("No user session found. Please log in again.");
+        console.error('No user session found');
+        setError("No user session found. Please log in again.");
         throw new Error('No user session found');
       }
 
-      // Upload profile image if exists
       let profileImageUrl = null;
       if (formData.profileImage) {
         try {
+          console.log('Starting profile image upload');
           const fileExt = formData.profileImage.name.split('.').pop();
           const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
           const filePath = `profile-images/${fileName}`;
@@ -200,7 +199,7 @@ export default function RegisterPage() {
 
           if (uploadError) {
             console.error('Upload error:', uploadError);
-            toast.error("Failed to upload profile image: " + uploadError.message);
+            setError("Failed to upload profile image: " + uploadError.message);
             throw new Error('Failed to upload profile image');
           }
 
@@ -209,15 +208,14 @@ export default function RegisterPage() {
             .getPublicUrl(filePath);
 
           profileImageUrl = publicUrl;
-          toast.success("Profile image uploaded successfully!");
+          console.log('Profile image uploaded successfully');
         } catch (uploadErr) {
           console.error('Image upload error:', uploadErr);
-          toast.error("Failed to upload image. Continuing without profile image.");
           // Continue without the image if upload fails
         }
       }
 
-      // Update user profile in Supabase
+      console.log('Updating user profile');
       const { data: profileData, error: updateError } = await supabase
         .from('profiles')
         .upsert({
@@ -232,34 +230,30 @@ export default function RegisterPage() {
           bio: formData.bio.trim(),
           profile_image: profileImageUrl,
           gender: session.user.user_metadata?.gender,
-          votes: 0, // Initialize votes to 0
+          votes: 0,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'id'
         });
 
       if (updateError) {
-        console.error('Profile update error details:', {
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint
-        });
-        toast.error(`Failed to update profile: ${updateError.message}`);
-        throw new Error(`Failed to update profile: ${updateError.message}`);
+        console.error('Profile update error:', updateError);
+        setError(`Failed to update profile: ${updateError.message}`);
+        throw updateError;
       }
 
-      toast.success("Profile created successfully!");
+      console.log('Profile created successfully');
 
-      // Get user's gender from metadata
       const gender = session.user.user_metadata?.gender;
       console.log('User gender:', gender);
 
       if (!gender) {
-        toast.error("Gender not found in user metadata");
+        console.error('Gender not found in metadata');
+        setError("Gender not found in user metadata");
         throw new Error('Gender not found in user metadata');
       }
 
-      // Redirect based on gender
+      console.log('Redirecting based on gender:', gender);
       if (gender === 'male') {
         console.log('Redirecting to boys vote page...');
         router.push('/vote/boys');
@@ -267,17 +261,27 @@ export default function RegisterPage() {
         console.log('Redirecting to girls vote page...');
         router.push('/vote/girls');
       } else {
-        toast.error("Invalid gender value");
+        console.error('Invalid gender value');
+        setError("Invalid gender value");
         throw new Error('Invalid gender value');
       }
     } catch (err) {
       console.error('Registration error:', err);
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during registration';
       setError(errorMessage);
-      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Modify the handleSubmitButtonClick function
+  const handleSubmitButtonClick = (e: React.MouseEvent | React.TouchEvent) => {
+    console.log('Submit button clicked/touched');
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Directly call handleSubmit instead of dispatching event
+    handleSubmit(new Event('submit') as any);
   };
 
   return (
@@ -304,7 +308,14 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit(e);
+            }}
+            className="space-y-6"
+            style={{ touchAction: 'manipulation' }}
+          >
             <div className="flex flex-col items-center mb-8">
               <div className="relative w-40 h-40 mb-4">
                 {imagePreview ? (
@@ -475,14 +486,36 @@ export default function RegisterPage() {
               />
             </div>
 
-            <GradientButton
-              type="submit"
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-              disabled={loading}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {loading ? "Completing Registration..." : "Complete Registration"}
-            </GradientButton>
+            <div className="w-full">
+              <button
+                type="button" // Changed from 'submit' to 'button'
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 rounded-lg py-3 px-4 flex items-center justify-center gap-2 touch-manipulation active:scale-95"
+                disabled={loading}
+                onClick={handleSubmitButtonClick}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  handleSubmitButtonClick(e);
+                }}
+                style={{ 
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  WebkitAppearance: 'none',
+                  appearance: 'none',
+                  outline: 'none',
+                  transition: 'transform 0.15s ease'
+                }}
+              >
+                <Save className="h-4 w-4" />
+                <span className="font-medium">
+                  {loading ? "Completing Registration..." : "Complete Registration"}
+                </span>
+              </button>
+            </div>
           </form>
         </Card>
       </main>

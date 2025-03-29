@@ -4,6 +4,7 @@ import "./globals.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import dynamic from 'next/dynamic';
 import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 // Dynamically import Toaster with client-side only rendering
 const ToasterProvider = dynamic(
