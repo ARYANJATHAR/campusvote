@@ -44,23 +44,25 @@ export default function Dashboard() {
       const gender = session.user.user_metadata?.gender;
       setUserGender(gender);
 
-      // Automatically redirect based on gender
-      if (gender === 'male') {
-        router.push('/dashboard/boys');
-        return;
-      } else if (gender === 'female') {
-        router.push('/dashboard/girls');
-        return;
-      }
-
-      const { data: profile, error } = await supabase
+      // First check if user has a profile
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
 
-      if (error) {
-        console.error("Error fetching profile:", error);
+      if (!profile || profileError) {
+        console.log("No profile found, redirecting to registration");
+        router.push("/register");
+        return;
+      }
+
+      // Only redirect based on gender if profile exists
+      if (gender === 'male') {
+        router.push('/dashboard/boys');
+        return;
+      } else if (gender === 'female') {
+        router.push('/dashboard/girls');
         return;
       }
 

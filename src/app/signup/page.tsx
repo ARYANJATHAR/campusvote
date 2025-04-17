@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
+import { Navbar } from "@/components/landing/Navbar";
 import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -193,6 +193,7 @@ export default function SignupPage() {
           data: {
             gender: formData.gender,
           },
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
         },
       });
 
@@ -201,14 +202,14 @@ export default function SignupPage() {
         throw error;
       }
 
-      // Show success message and redirect to login
+      // Show success message and redirect to verify page
       setSuccess(true);
       
-      // Sign out the user to ensure they need to login again
+      // Sign out the user to ensure they need to verify their email
       await supabase.auth.signOut();
       
-      // Redirect to login page
-      router.push("/login");
+      // Redirect to verify page
+      router.push("/verify");
     } catch (err) {
       console.error("Signup error:", err);
       const errorMessage = err instanceof Error ? err.message : "An error occurred during signup";
@@ -258,7 +259,7 @@ export default function SignupPage() {
 
           {success && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-600 rounded-lg text-sm">
-              Account created successfully! Redirecting to login page...
+              Account created successfully! Redirecting to verify page...
             </div>
           )}
 

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
+import { Navbar } from "@/components/landing/Navbar";
 import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -59,21 +59,27 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    console.log("Login submission started");
 
     try {
       const supabase = createClient();
+      console.log("Attempting to sign in user...");
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password
       });
 
       if (error) {
+        console.error("Login error:", error);
         setError(error.message);
         throw error;
       }
 
       if (data?.user) {
-        // Check if user has already registered
+        console.log("User logged in successfully:", data.user.id);
+        
+        // First check if user has completed their profile
+        console.log("Checking for existing profile...");
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
@@ -81,23 +87,46 @@ export default function LoginPage() {
           .single();
 
         if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          setError("Please complete your registration to continue");
-          // If profile doesn't exist, redirect to register
+          console.log("Error fetching profile:", profileError);
+        }
+        
+        // DETAILED LOGGING START
+        console.log("Profile check results:", { profile, profileError });
+        // DETAILED LOGGING END
+
+        // Check if profile exists and has required fields
+        const isProfileComplete = profile && 
+          profile.name && 
+          profile.age && 
+          profile.college_name && 
+          profile.education && 
+          profile.year && 
+          profile.city;
+
+        if (!isProfileComplete) {
+          console.log("No complete profile found, redirecting to registration");
+          toast.info("Please complete your profile registration");
           router.push("/register");
           return;
         }
-        
-        // If profile exists, get user's gender and redirect to appropriate vote page
+
+        // Only if profile exists and is complete, redirect to appropriate vote page
+        console.log("Complete profile found:", profile);
+        console.log("User gender:", data.user.user_metadata?.gender);
         const userGender = data.user.user_metadata?.gender;
+        
         if (userGender === 'male') {
+          console.log("Redirecting to boys vote page");
           router.push("/vote/boys");
         } else if (userGender === 'female') {
+          console.log("Redirecting to girls vote page");
           router.push("/vote/girls");
         } else {
+          console.log("No gender specified, redirecting to general vote page");
           router.push("/vote");
         }
       } else {
+        console.error("No user data received after successful login");
         throw new Error("Login failed - no user data received");
       }
     } catch (err) {

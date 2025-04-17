@@ -201,14 +201,25 @@ export default function GirlsDashboardPage() {
         return;
       }
 
-      const { data: profile, error } = await supabase
+      // Check if user has a profile
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
 
-      if (error) {
-        console.error("Error fetching profile:", error);
+      // Check if profile exists and has required fields
+      const isProfileComplete = profile && 
+        profile.name && 
+        profile.age && 
+        profile.college_name && 
+        profile.education && 
+        profile.year && 
+        profile.city;
+
+      if (!isProfileComplete) {
+        console.log("No complete profile found, redirecting to registration");
+        router.push("/register");
         return;
       }
 

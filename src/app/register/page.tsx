@@ -57,14 +57,41 @@ export default function RegisterPage() {
   const [imageError, setImageError] = useState("");
 
   useEffect(() => {
-    const getUserGender = async () => {
+    const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.user_metadata?.gender) {
-        setUserGender(session.user.user_metadata.gender);
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      // Check if user already has a profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        // If profile exists, redirect to appropriate dashboard
+        const gender = session.user.user_metadata?.gender;
+        if (gender === 'male') {
+          router.push('/dashboard/boys');
+        } else if (gender === 'female') {
+          router.push('/dashboard/girls');
+        } else {
+          router.push('/dashboard');
+        }
+      } else {
+        // Get user's gender from metadata
+        const gender = session.user.user_metadata?.gender;
+        if (gender) {
+          setUserGender(gender);
+        }
       }
     };
-    getUserGender();
-  }, [supabase.auth]);
+
+    checkAuth();
+  }, [router, supabase]);
 
   const validateAge = (age: string) => {
     const ageNum = parseInt(age);
@@ -255,15 +282,14 @@ export default function RegisterPage() {
 
       console.log('Redirecting based on gender:', gender);
       if (gender === 'male') {
-        console.log('Redirecting to boys vote page...');
-        router.push('/vote/boys');
+        console.log('Redirecting to boys dashboard...');
+        router.push('/dashboard/boys');
       } else if (gender === 'female') {
-        console.log('Redirecting to girls vote page...');
-        router.push('/vote/girls');
+        console.log('Redirecting to girls dashboard...');
+        router.push('/dashboard/girls');
       } else {
-        console.error('Invalid gender value');
-        setError("Invalid gender value");
-        throw new Error('Invalid gender value');
+        console.log('Redirecting to main dashboard...');
+        router.push('/dashboard');
       }
     } catch (err) {
       console.error('Registration error:', err);

@@ -9,6 +9,7 @@ import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { calculateUserRank } from "@/lib/utils";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function Leaderboard() {
   const supabase = createClient();
@@ -242,11 +243,18 @@ export default function Leaderboard() {
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="h-10 w-10 flex-shrink-0">
-                                <img
-                                  className="h-10 w-10 rounded-full ring-2 ring-indigo-100 transition-transform duration-300 hover:scale-110"
-                                  src={student.profile_image || "https://via.placeholder.com/40"}
-                                  alt=""
+                              <div className="h-10 w-10 flex-shrink-0 relative">
+                                <Image
+                                  src={student.profile_image || "/default-avatar.png"}
+                                  alt={`${student.name}'s photo`}
+                                  width={40}
+                                  height={40}
+                                  className="rounded-full object-cover w-10 h-10"
+                                  loading="lazy"
+                                  sizes="40px"
+                                  quality={75}
+                                  placeholder="blur"
+                                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRoaHSQtJSAyVC08MTY3LjIxPVFHUj5TTlBMYWRkX3R7g4OGbnFxkZ6kqKD/2wBDARUXFx4aHR4eHSQlH0AlJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                                 />
                               </div>
                             </div>

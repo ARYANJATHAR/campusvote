@@ -14,10 +14,12 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <i className="fa-solid fa-heart-pulse text-2xl text-indigo-600 animate-pulse" aria-hidden="true"></i>
-          <span className="text-xl font-bold">
-            <GradientText className="bg-gradient-to-r from-indigo-600 to-purple-600">CampusVotes</GradientText>
-          </span>
+          <Link href="/" className="flex items-center space-x-2">
+            <i className="fa-solid fa-heart-pulse text-2xl text-indigo-600 animate-pulse" aria-hidden="true"></i>
+            <span className="text-xl font-bold">
+              <GradientText className="bg-gradient-to-r from-indigo-600 to-purple-600">CampusVotes</GradientText>
+            </span>
+          </Link>
         </div>
 
         {/* Mobile menu button */}
@@ -31,6 +33,9 @@ export function Navbar() {
 
         {/* Desktop menu */}
         <div className="hidden md:flex items-center space-x-4" role="menubar">
+          <Link href="/" className="text-gray-600 hover:text-indigo-600 transition-colors duration-300">
+            Home
+          </Link>
           <Link href="/login">
             <GradientButton 
               variant="outline"
@@ -54,6 +59,13 @@ export function Navbar() {
       {/* Mobile menu */}
       <div className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} transition-all duration-300 ease-in-out`}>
         <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t border-gray-100">
+          <Link 
+            href="/" 
+            className="block px-3 py-2 text-gray-600 hover:text-indigo-600 transition-colors duration-300"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <i className="fas fa-home mr-2"></i><span className="text-lg font-bold font-sans">Home</span>
+          </Link>
           <Link href="/login" className="block px-3 py-2">
             <GradientButton 
               variant="outline"

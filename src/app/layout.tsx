@@ -5,6 +5,7 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import dynamic from 'next/dynamic';
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SupabaseProvider } from "@/components/providers/supabase-provider";
 
 // Dynamically import Toaster with client-side only rendering
 const ToasterProvider = dynamic(
@@ -82,9 +83,12 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://lgojtvkphvgcqspeaick.supabase.co" />
       </head>
       <body className={`${poppins.variable} ${robotoMono.variable} font-sans antialiased`}>
-        {children}
-        <ToasterProvider />
-        <Analytics />
+        <SupabaseProvider>
+          {children}
+          <ToasterProvider />
+          <Analytics />
+          <SpeedInsights />
+        </SupabaseProvider>
       </body>
     </html>
   );

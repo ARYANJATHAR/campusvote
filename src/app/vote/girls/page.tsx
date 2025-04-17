@@ -20,17 +20,11 @@ export default function GirlsVotePage() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [currentPair, setCurrentPair] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [imageLoading, setImageLoading] = useState<{[key: string]: boolean}>({});
-  const [imagesReady, setImagesReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewedProfiles, setViewedProfiles] = useState<string[]>([]);
   const [viewedPairs, setViewedPairs] = useState<Set<string>>(new Set());
   const [allPairsViewed, setAllPairsViewed] = useState(false);
   const [nextPair, setNextPair] = useState<any[]>([]);
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
-  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -43,11 +37,24 @@ export default function GirlsVotePage() {
       // Check if user is female
       const userGender = session.user.user_metadata?.gender;
       if (userGender !== 'female') {
+        router.push('/vote/boys');
+        return;
+      }
+
+      // Check if user has a profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile || profileError) {
+        console.log("No profile found, redirecting to registration");
         router.push('/register');
         return;
       }
 
-      // Only fetch profiles if authentication passes
+      // Only fetch profiles if authentication passes and profile exists
       fetchProfiles();
     };
 
@@ -63,31 +70,6 @@ export default function GirlsVotePage() {
     }
     return newArray;
   };
-
-  // Optimized image preloading
-  const preloadImages = useCallback((profiles: any[]) => {
-    profiles.forEach(profile => {
-      if (profile.profile_image && !preloadedImages.has(profile.profile_image)) {
-        const img = new window.Image();
-        img.src = profile.profile_image;
-        setPreloadedImages(prev => new Set([...prev, profile.profile_image]));
-      }
-    });
-  }, [preloadedImages]);
-
-  // Preload next batch of images
-  const preloadNextBatch = useCallback(() => {
-    if (profiles.length < 2) return;
-
-    // Get next 4 profiles that haven't been viewed
-    const remainingProfiles = profiles.filter(profile => 
-      !viewedProfiles.includes(profile.id)
-    ).slice(0, 4);
-
-    if (remainingProfiles.length > 0) {
-      preloadImages(remainingProfiles);
-    }
-  }, [profiles, viewedProfiles, preloadImages]);
 
   const fetchProfiles = useCallback(async () => {
     try {
@@ -105,15 +87,12 @@ export default function GirlsVotePage() {
       
       // Set initial pair
       if (shuffledProfiles.length >= 2) {
-        const initialPair = [shuffledProfiles[0], shuffledProfiles[1]];
+        const initialPair = generateRandomPair(shuffledProfiles);
         setCurrentPair(initialPair);
-        setViewedProfiles([shuffledProfiles[0].id, shuffledProfiles[1].id]);
-        // Add this pair to viewed pairs
-        setViewedPairs(new Set([`${shuffledProfiles[0].id}-${shuffledProfiles[1].id}`]));
         
-        // Preload initial pair images and next batch
-        preloadImages(initialPair);
-        preloadNextBatch();
+        // Add this pair to viewed pairs
+        const pairKey = getPairKey(initialPair[0].id, initialPair[1].id);
+        setViewedPairs(new Set([pairKey]));
       }
     } catch (error) {
       console.error('Error fetching profiles:', error);
@@ -121,7 +100,20 @@ export default function GirlsVotePage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, preloadImages, preloadNextBatch]);
+  }, [supabase]);
+
+  // Helper function to get a unique pair key
+  const getPairKey = (id1: string, id2: string) => {
+    return [id1, id2].sort().join('-');
+  };
+
+  // Generate a random pair from profiles
+  const generateRandomPair = (profilesList: any[]) => {
+    if (profilesList.length < 2) return [];
+    
+    const shuffled = shuffleArray([...profilesList]);
+    return [shuffled[0], shuffled[1]];
+  };
 
   const getNextPair = () => {
     // Check if all possible pairs have been viewed
@@ -136,28 +128,24 @@ export default function GirlsVotePage() {
     
     // Try to find a pair that hasn't been viewed yet
     let attempts = 0;
-    const maxAttempts = 50; // Limit attempts to prevent infinite loop
+    const maxAttempts = 100; // Increase attempts to try harder to find unviewed pairs
     
     while (attempts < maxAttempts) {
       attempts++;
       
       // Get two random profiles
-      const remainingProfiles = shuffleArray([...profiles]);
+      const pair = generateRandomPair(profiles);
       
-      if (remainingProfiles.length < 2) break;
+      if (pair.length < 2) break;
       
-      const profile1 = remainingProfiles[0];
-      const profile2 = remainingProfiles[1];
-      
-      // Create a unique identifier for this pair (sorted to ensure same pair in different order is considered the same)
-      const pairIds = [profile1.id, profile2.id].sort();
-      const pairKey = `${pairIds[0]}-${pairIds[1]}`;
+      // Create a unique identifier for this pair
+      const pairKey = getPairKey(pair[0].id, pair[1].id);
       
       // Check if this pair has been viewed
       if (!viewedPairs.has(pairKey)) {
         // New pair found
-        setCurrentPair([profile1, profile2]);
-        setViewedPairs(new Set([...viewedPairs, pairKey]));
+        setCurrentPair(pair);
+        setViewedPairs(prev => new Set([...prev, pairKey]));
         return;
       }
     }
@@ -173,7 +161,6 @@ export default function GirlsVotePage() {
     if (isVoting) return; // Prevent multiple votes while processing
     setIsVoting(true);
     
-    // Removed loading toast
     await handleVote(profile.id);
   };
 
@@ -191,33 +178,21 @@ export default function GirlsVotePage() {
         return;
       }
 
-      // Record the vote
+      // Upsert the vote to avoid unique constraint violations
       const { data: voteData, error: voteError } = await supabase
         .from('votes')
-        .insert({
+        .upsert({
           voter_id: session.user.id,
           voted_for_id: profileId,
           created_at: new Date().toISOString()
+        }, {
+          onConflict: 'voter_id,voted_for_id',
+          ignoreDuplicates: true
         })
         .select();
 
       if (voteError) {
         toast.error(`Error recording vote: ${voteError.message}`);
-        return;
-      }
-
-      // Update the profile's vote count directly
-      const currentProfile = profiles.find(p => p.id === profileId);
-      const currentVotes = currentProfile?.votes || 0;
-      
-      const { data: updateData, error: updateError } = await supabase
-        .from('profiles')
-        .update({ votes: currentVotes + 1 })
-        .eq('id', profileId)
-        .select();
-
-      if (updateError) {
-        toast.error(`Error updating vote count: ${updateError.message}`);
         return;
       }
 
@@ -230,7 +205,7 @@ export default function GirlsVotePage() {
         className: 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold',
       });
 
-      // Get next pair after voting is complete (removed setTimeout)
+      // Get next pair after voting is complete
       getNextPair();
 
     } catch (error) {
@@ -250,24 +225,15 @@ export default function GirlsVotePage() {
     
     while (attempts < maxAttempts) {
       attempts++;
-      const remainingProfiles = shuffleArray([...profiles]);
       
-      if (remainingProfiles.length < 2) break;
+      const pair = generateRandomPair(profiles);
       
-      const profile1 = remainingProfiles[0];
-      const profile2 = remainingProfiles[1];
-      const pairIds = [profile1.id, profile2.id].sort();
-      const pairKey = `${pairIds[0]}-${pairIds[1]}`;
+      if (pair.length < 2) break;
+      
+      const pairKey = getPairKey(pair[0].id, pair[1].id);
       
       if (!viewedPairs.has(pairKey)) {
-        setNextPair([profile1, profile2]);
-        // Preload images
-        [profile1, profile2].forEach(profile => {
-          if (profile.profile_image) {
-            const img = new window.Image();
-            img.src = profile.profile_image;
-          }
-        });
+        setNextPair(pair);
         break;
       }
     }
@@ -275,36 +241,9 @@ export default function GirlsVotePage() {
 
   useEffect(() => {
     if (currentPair.length === 2) {
-      // Reset image loading state when current pair changes
-      setImagesReady(false);
-      setImageLoading({
-        [currentPair[0].id]: true,
-        [currentPair[1].id]: true
-      });
-      
-      // Preload next batch of images
-      preloadNextBatch();
+      preloadNextPair();
     }
-  }, [currentPair, preloadNextBatch]);
-
-  const handleImageLoad = (profileId: string) => {
-    setImageLoading(prev => {
-      const newState = {
-        ...prev,
-        [profileId]: false
-      };
-      
-      // Check if all images in the current pair are loaded
-      if (currentPair.length === 2 && 
-          !newState[currentPair[0].id] && 
-          !newState[currentPair[1].id]) {
-        // Small delay to ensure smooth transition
-        setTimeout(() => setImagesReady(true), 100);
-      }
-      
-      return newState;
-    });
-  };
+  }, [currentPair, preloadNextPair]);
 
   if (loading) {
     return (
@@ -351,9 +290,9 @@ export default function GirlsVotePage() {
 
           {currentPair.length === 0 ? (
             <div className="text-center py-12 bg-white/80 rounded-2xl shadow-xl p-8 border border-gray-100">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-4">No more profiles to vote!</h2>
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">No more votes!</h2>
               {allPairsViewed ? (
-                <p className="text-gray-600 mb-6">You've seen all possible profile combinations. Please check back later for new profiles!</p>
+                <p className="text-gray-600 mb-6">You've seen all possible profile combinations.</p>
               ) : (
                 <p className="text-gray-600 mb-6">Check back later for more profiles to vote on.</p>
               )}
@@ -375,21 +314,15 @@ export default function GirlsVotePage() {
                 >
                   <div className="flex flex-col gap-4">
                     <div className="relative aspect-[4/3] rounded-xl overflow-hidden ring-2 ring-indigo-100">
-                      <div className={`absolute inset-0 bg-gray-100 animate-pulse ${!imageLoading[profile.id] ? 'hidden' : ''}`} />
+                      <div className="absolute inset-0 bg-gray-100 animate-pulse" />
                       <Image
                         src={profile.profile_image || '/default-avatar.png'}
-                        alt={profile.name}
+                        alt={`${profile.name}'s photo`}
                         fill
-                        quality={85}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className={`object-cover transition-transform duration-300 hover:scale-105 ${
-                          imagesReady ? 'opacity-100' : 'opacity-0'
-                        }`}
+                        className="object-cover"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         priority={true}
-                        onLoad={() => handleImageLoad(profile.id)}
-                        loading="eager"
-                        placeholder="blur"
-                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4dHRsdHR4dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR3/2wBDAR4WFiMeJR4lHR0lLiUdHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR3/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                        quality={75}
                       />
                     </div>
 
