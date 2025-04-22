@@ -99,6 +99,15 @@ const nextConfig = {
   },
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   trailingSlash: true,
+  async redirects() {
+    return [
+      {
+        source: '/auth/confirm',
+        destination: '/auth/callback',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig 
