@@ -33,6 +33,7 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  swcMinify: true,
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ['@fortawesome/fontawesome-free'],

@@ -164,6 +164,13 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
+    // Validate all required fields
+    if (!formData.email || !formData.password || !formData.confirmPassword || !formData.gender) {
+      setError("Please fill in all required fields");
+      setLoading(false);
+      return;
+    }
+
     // Validate password length
     if (formData.password.length < 6) {
       setError("Password must be at least 6 characters long");
@@ -266,7 +273,7 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email Address
+                Email Address <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Input
@@ -298,7 +305,7 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium text-gray-700">
-                Password
+                Password <span className="text-red-500">*</span>
               </label>
               <div className="space-y-2">
                 <div className="relative">
@@ -373,7 +380,7 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
-                Confirm Password
+                Confirm Password <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Input
@@ -415,15 +422,18 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label htmlFor="gender" className="text-sm font-medium text-gray-700">
-                Gender
+                Gender <span className="text-red-500">*</span>
               </label>
               <Select
                 value={formData.gender}
                 onValueChange={(value: string) =>
                   setFormData((prev) => ({ ...prev, gender: value }))
                 }
+                required
               >
-                <SelectTrigger className="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                <SelectTrigger className={`w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 ${
+                  !formData.gender && error ? "border-red-500" : ""
+                }`}>
                   <SelectValue placeholder="Select your gender" />
                 </SelectTrigger>
                 <SelectContent>
@@ -431,6 +441,9 @@ export default function SignupPage() {
                   <SelectItem value="female">Female</SelectItem>
                 </SelectContent>
               </Select>
+              {!formData.gender && error && (
+                <p className="text-xs text-red-500 mt-1">Please select your gender</p>
+              )}
             </div>
 
             <Button

@@ -71,8 +71,17 @@ export default function RegisterPage() {
         .eq('id', session.user.id)
         .single();
 
-      if (profile) {
-        // If profile exists, redirect to appropriate dashboard
+      // Only redirect if profile exists AND all required fields are filled
+      if (profile && 
+          profile.name && 
+          profile.age && 
+          profile.college_name && 
+          profile.education &&
+          profile.year &&
+          profile.city &&
+          profile.hobbies &&
+          profile.bio) {
+        // If profile exists and is complete, redirect to appropriate dashboard
         const gender = session.user.user_metadata?.gender;
         if (gender === 'male') {
           router.push('/dashboard/boys');
@@ -156,31 +165,59 @@ export default function RegisterPage() {
   };
 
   const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+
+    // Check all required fields
     if (!formData.name.trim()) {
-      setError("Name is required");
-      return false;
+      errors.name = "Name is required";
     }
-    const ageNum = parseInt(formData.age);
-    if (!formData.age || isNaN(ageNum) || ageNum < 16 || ageNum > 25) {
-      setError("Age must be between 16 and 25");
-      return false;
+
+    if (!formData.age) {
+      errors.age = "Age is required";
+    } else {
+      const ageNum = parseInt(formData.age);
+      if (isNaN(ageNum) || ageNum < 18 || ageNum > 30) {
+        errors.age = "Age must be between 18 and 30";
+      }
     }
+
     if (!formData.collegeName.trim()) {
-      setError("College name is required");
-      return false;
+      errors.collegeName = "College name is required";
     }
+
     if (!formData.education.trim()) {
-      setError("Education is required");
-      return false;
+      errors.education = "Education is required";
     }
+
     if (!formData.year) {
-      setError("Year is required");
-      return false;
+      errors.year = "Year is required";
     }
+
     if (!formData.city.trim()) {
-      setError("City is required");
+      errors.city = "City is required";
+    }
+
+    if (!formData.hobbies.trim()) {
+      errors.hobbies = "Hobbies are required";
+    }
+
+    if (!formData.bio.trim()) {
+      errors.bio = "Bio is required";
+    }
+
+    if (!formData.profileImage) {
+      errors.profileImage = "Profile image is required";
+    }
+
+    // Update field errors state
+    setFieldErrors(errors);
+
+    // If there are any errors, set the main error message
+    if (Object.keys(errors).length > 0) {
+      setError("Please fill in all required fields");
       return false;
     }
+
     return true;
   };
 
@@ -348,10 +385,14 @@ export default function RegisterPage() {
                   <img
                     src={imagePreview}
                     alt="Profile preview"
-                    className="w-full h-full rounded-full object-cover ring-4 ring-indigo-100 transition-transform duration-300 hover:scale-105"
+                    className={`w-full h-full rounded-full object-cover ring-4 ${
+                      fieldErrors.profileImage ? "ring-red-200" : "ring-indigo-100"
+                    } transition-transform duration-300 hover:scale-105`}
                   />
                 ) : (
-                  <div className="w-full h-full rounded-full bg-indigo-50 flex items-center justify-center ring-4 ring-indigo-100">
+                  <div className={`w-full h-full rounded-full bg-indigo-50 flex items-center justify-center ring-4 ${
+                    fieldErrors.profileImage ? "ring-red-200" : "ring-indigo-100"
+                  }`}>
                     <User className="w-16 h-16 text-indigo-400" />
                   </div>
                 )}
@@ -371,7 +412,9 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-              <p className="text-sm text-gray-500">Upload your profile picture (max 5MB, JPEG/PNG/JPG)</p>
+              <p className="text-sm text-gray-500">
+                Upload your profile picture (max 5MB, JPEG/PNG/JPG) <span className="text-red-500">*</span>
+              </p>
               {imageError && (
                 <p className="text-sm text-red-500 mt-1">{imageError}</p>
               )}
@@ -383,7 +426,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium text-gray-700">
-                  Full Name
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <Input
                   id="name"
@@ -404,7 +447,7 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <label htmlFor="age" className="text-sm font-medium text-gray-700">
-                  Age (18-30)
+                  Age (18-30) <span className="text-red-500">*</span>
                 </label>
                 <Input
                   id="age"
@@ -426,7 +469,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="college_name" className="text-gray-700">College Name</Label>
+                <Label htmlFor="college_name" className="text-gray-700">
+                  College Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="college_name"
                   name="collegeName"
@@ -438,7 +483,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="education" className="text-gray-700">Education Level</Label>
+                <Label htmlFor="education" className="text-gray-700">
+                  Education Level <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="education"
                   name="education"
@@ -451,14 +498,19 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="year" className="text-gray-700">Year</Label>
+                <Label htmlFor="year" className="text-gray-700">
+                  Year <span className="text-red-500">*</span>
+                </Label>
                 <Select
                   value={formData.year}
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, year: value }))
                   }
+                  required
                 >
-                  <SelectTrigger className="w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200">
+                  <SelectTrigger className={`w-full border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors duration-200 ${
+                    fieldErrors.year ? "border-red-500" : ""
+                  }`}>
                     <SelectValue placeholder="Select current year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -472,7 +524,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="city" className="text-gray-700">City</Label>
+                <Label htmlFor="city" className="text-gray-700">
+                  City <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="city"
                   name="city"
@@ -484,7 +538,9 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="bio" className="text-gray-700">Bio</Label>
+                <Label htmlFor="bio" className="text-gray-700">
+                  Bio <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
                   id="bio"
                   name="bio"
@@ -499,7 +555,7 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <label htmlFor="hobbies" className="text-sm font-medium text-gray-700">
-                Hobbies & Interests
+                Hobbies & Interests <span className="text-red-500">*</span>
               </label>
               <Textarea
                 id="hobbies"

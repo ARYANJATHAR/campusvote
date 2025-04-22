@@ -7,84 +7,40 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
-import { calculateUserRank } from "@/lib/utils";
 import { toast } from "sonner";
 import Image from "next/image";
+import { Profile } from "@/types/profile";
 
 export default function Leaderboard() {
   const supabase = createClient();
   const router = useRouter();
   const [userGender, setUserGender] = useState<string | null>(null);
   const [selectedGender, setSelectedGender] = useState<'boys' | 'girls'>('boys');
-  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Demo data for testing
-  const demoData = [
-    {
-      id: 1,
-      name: "John Smith",
-      profile_image: "https://i.pravatar.cc/150?img=1",
-      votes: 150,
-      gender: "male"
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      profile_image: "https://i.pravatar.cc/150?img=2",
-      votes: 145,
-      gender: "female"
-    },
-    {
-      id: 3,
-      name: "Mike Wilson",
-      profile_image: "https://i.pravatar.cc/150?img=3",
-      votes: 130,
-      gender: "male"
-    },
-    {
-      id: 4,
-      name: "Emma Davis",
-      profile_image: "https://i.pravatar.cc/150?img=4",
-      votes: 125,
-      gender: "female"
-    },
-    {
-      id: 5,
-      name: "David Brown",
-      profile_image: "https://i.pravatar.cc/150?img=5",
-      votes: 120,
-      gender: "male"
-    }
-  ];
 
   const getLeaderboardData = async () => {
     try {
       setIsRefreshing(true);
       setLoading(true);
-      console.log('Fetching fresh leaderboard data...');
+      
+      console.log("Fetching leaderboard data for gender:", selectedGender);
+
+      // Get profiles with their vote counts
       const { data: profiles, error } = await supabase
         .from("profiles")
-        .select("id, name, profile_image, votes, gender")
-        .order("votes", { ascending: false })
-        .limit(20)
-        .throwOnError();
+        .select("*")
+        .eq("gender", selectedGender === 'boys' ? 'male' : 'female')
+        .order('votes', { ascending: false });
 
       if (error) {
-        console.error("Error fetching leaderboard:", error);
-        return;
+        console.error("Supabase error:", error);
+        throw error;
       }
-
-      // Sort profiles by votes in descending order
-      const sortedProfiles = profiles?.sort((a, b) => b.votes - a.votes) || [];
       
-      console.log('New leaderboard data:', sortedProfiles.map(p => ({
-        name: p.name,
-        votes: p.votes
-      })));
-      
-      setLeaderboardData(sortedProfiles);
+      console.log("Fetched profiles:", profiles?.length || 0);
+      setLeaderboardData(profiles || []);
     } catch (error) {
       console.error("Error in getLeaderboardData:", error);
       toast.error("Failed to fetch leaderboard data");
@@ -94,10 +50,7 @@ export default function Leaderboard() {
     }
   };
 
-  const handleRefresh = async () => {
-    await getLeaderboardData();
-  };
-
+  // Initial load and gender check
   useEffect(() => {
     const getUserGender = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -116,9 +69,12 @@ export default function Leaderboard() {
 
     getUserGender();
     getLeaderboardData();
+  }, []);
 
-    // Set up real-time subscription
-    const subscription = supabase
+  // Set up real-time subscription for profiles
+  useEffect(() => {
+    // Listen for profile changes
+    const profilesChannel = supabase
       .channel('profiles_changes')
       .on(
         'postgres_changes',
@@ -127,25 +83,25 @@ export default function Leaderboard() {
           schema: 'public',
           table: 'profiles'
         },
-        (payload) => {
-          console.log('Real-time update received:', payload);
+        () => {
           getLeaderboardData();
         }
       )
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(profilesChannel);
     };
-  }, []);
+  }, [selectedGender]);
 
-  const filteredData = leaderboardData
-    .filter(profile => profile.gender === (selectedGender === 'boys' ? 'male' : 'female'))
-    .sort((a, b) => b.votes - a.votes)
-    .map((profile, index) => ({
-      ...profile,
-      rank: index + 1
-    }));
+  // Refresh data when gender selection changes
+  useEffect(() => {
+    getLeaderboardData();
+  }, [selectedGender]);
+
+  const handleRefresh = () => {
+    getLeaderboardData();
+  };
 
   if (loading) {
     return (
@@ -236,10 +192,10 @@ export default function Leaderboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredData.map((student) => (
+                      {leaderboardData.map((student, index) => (
                         <tr key={student.id} className="hover:bg-indigo-50/50 transition-colors duration-300">
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">
-                            {student.rank}
+                            {index + 1}
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">

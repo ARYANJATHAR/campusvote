@@ -16,23 +16,27 @@ export function createServerSupabaseClient() {
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value
+          try {
+            return cookieStore.get(name)?.value
+          } catch (error) {
+            return undefined
+          }
         },
         set(name: string, value: string, options: any) {
           try {
             cookieStore.set({ name, value, ...options })
           } catch (error) {
-            // Handle cookie setting error in edge functions
+            // Silently handle error
           }
         },
         remove(name: string, options: any) {
           try {
             cookieStore.set({ name, value: '', ...options })
           } catch (error) {
-            // Handle cookie removal error in edge functions
+            // Silently handle error
           }
         },
       },
     }
   )
-} 
+}
