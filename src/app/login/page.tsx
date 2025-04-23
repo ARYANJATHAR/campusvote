@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -11,9 +11,21 @@ import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
+// Separate component for the verification check
+function VerificationCheck() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('verified') === 'true') {
+      toast.success('Email verified successfully! Please log in.');
+    }
+  }, [searchParams]);
+
+  return null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -22,13 +34,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    // Show success message if email was just verified
-    if (searchParams.get('verified') === 'true') {
-      toast.success('Email verified successfully! Please log in.');
-    }
-  }, [searchParams]);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -148,6 +153,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-indigo-50 to-purple-50">
       <Navbar />
+      <Suspense fallback={null}>
+        <VerificationCheck />
+      </Suspense>
       <main className="flex-grow flex items-center justify-center px-4">
         <Card className="w-full max-w-md p-8 shadow-xl bg-white/95 backdrop-blur-sm">
           <div className="text-center mb-8">
