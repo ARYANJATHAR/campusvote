@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/landing/Navbar";
 import { createClient } from "@/lib/supabase-client";
 import { X, Eye, EyeOff } from "lucide-react";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -21,6 +22,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Show success message if email was just verified
+    if (searchParams.get('verified') === 'true') {
+      toast.success('Email verified successfully! Please log in.');
+    }
+  }, [searchParams]);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
