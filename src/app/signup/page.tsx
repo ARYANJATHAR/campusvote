@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -167,6 +167,22 @@ export default function SignupPage() {
     if (!email || !validateEmail(email)) return;
     
     try {
+      // First try to get user by email
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userData) {
+        const message = "This email is already registered. Please use a different email or sign in.";
+        setEmailError(message);
+        setIsEmailTaken(true);
+        toast.error(message);
+        return;
+      }
+
+      // Then check auth system
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -174,13 +190,13 @@ export default function SignupPage() {
         }
       });
       
-      // If no error, it means the email exists
       if (!error) {
         const message = "This email is already registered. Please use a different email or sign in.";
         setEmailError(message);
         setIsEmailTaken(true);
         toast.error(message);
       } else {
+        // Only clear errors if both checks pass
         setEmailError("");
         setIsEmailTaken(false);
       }
@@ -205,24 +221,26 @@ export default function SignupPage() {
         throw new Error("Please enter a valid email address");
       }
 
-      // Check if email is taken
-      if (isEmailTaken) {
-        throw new Error("This email is already registered. Please use a different email or sign in.");
+      // Double check if email is taken
+      const email = formData.email;
+      
+      // Check profiles table
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userData) {
+        const message = "This email is already registered. Please use a different email or sign in.";
+        setEmailError(message);
+        setIsEmailTaken(true);
+        throw new Error(message);
       }
 
-      // Validate password length
-      if (formData.password.length < 6) {
-        throw new Error("Password must be at least 6 characters long");
-      }
-
-      // Validate passwords match
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error("Passwords do not match");
-      }
-
-      // Final check if email exists before signup
+      // Check auth system
       const { error: emailCheckError } = await supabase.auth.signInWithOtp({
-        email: formData.email,
+        email,
         options: {
           shouldCreateUser: false,
         }
@@ -236,7 +254,7 @@ export default function SignupPage() {
         throw new Error(message);
       }
 
-      // Proceed with signup only if email doesn't exist
+      // If we get here, email is unique. Proceed with signup
       const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -249,6 +267,12 @@ export default function SignupPage() {
       });
 
       if (signUpError) {
+        if (signUpError.message.includes("already registered")) {
+          const message = "This email is already registered. Please use a different email or sign in.";
+          setEmailError(message);
+          setIsEmailTaken(true);
+          throw new Error(message);
+        }
         throw signUpError;
       }
 
@@ -279,6 +303,7 @@ export default function SignupPage() {
     }));
     if (fieldName === "email") {
       setEmailError("");
+      setIsEmailTaken(false);
     }
     if (fieldName === "password") {
       setPasswordError("");
@@ -287,6 +312,17 @@ export default function SignupPage() {
       setPasswordStrength({ score: 0, message: "", color: "" });
     }
   };
+
+  // Add debounced email check
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (formData.email && validateEmail(formData.email)) {
+        checkEmailExists(formData.email);
+      }
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(debounceTimer);
+  }, [formData.email]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-indigo-50 to-purple-50">
@@ -502,7 +538,9 @@ export default function SignupPage() {
               }`}
               disabled={loading || isEmailTaken || !!emailError}
             >
-              {loading ? "Creating Account..." : isEmailTaken ? "Email Already Registered" : "Create Account"}
+              {loading ? "Creating Account..." : 
+               isEmailTaken ? "Email Already Registered" : 
+               emailError ? "Invalid Email" : "Create Account"}
             </Button>
           </form>
 
