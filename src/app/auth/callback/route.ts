@@ -11,17 +11,27 @@ export async function GET(request: Request) {
     const supabase = createServerSupabaseClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error && data?.session) {
-      // If this is a signup verification, redirect to login
-      if (type === 'signup' || type === 'recovery') {
+    // Always redirect to login after email verification
+    if (type === 'signup' || type === 'recovery') {
+      // If verification was successful, add verified=true parameter
+      if (!error) {
         return NextResponse.redirect(`${requestUrl.origin}/login?verified=true`)
       }
-      
-      // For other cases (login, invite, etc), redirect to the next page
+      // If verification failed but the user is already verified (common case)
+      // still redirect to login with verified=true
+      if (error?.message?.includes('User already confirmed')) {
+        return NextResponse.redirect(`${requestUrl.origin}/login?verified=true`)
+      }
+      // For other errors, redirect to login without verified parameter
+      return NextResponse.redirect(`${requestUrl.origin}/login`)
+    }
+    
+    // For other cases (login, invite, etc), redirect to the next page if successful
+    if (!error && data?.session) {
       return NextResponse.redirect(`${requestUrl.origin}${next}`)
     }
   }
 
-  // Return the user to an error page with some instructions
-  return NextResponse.redirect(`${requestUrl.origin}/auth/auth-error`)
+  // For any other errors, redirect to login
+  return NextResponse.redirect(`${requestUrl.origin}/login`)
 } 
