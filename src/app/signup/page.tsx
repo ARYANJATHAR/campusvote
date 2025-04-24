@@ -39,6 +39,7 @@ export default function SignupPage() {
   }>({ score: 0, message: "", color: "" });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isEmailTaken, setIsEmailTaken] = useState(false);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -131,9 +132,9 @@ export default function SignupPage() {
     if (name === "email") {
       if (!validateEmail(value)) {
         setEmailError("Please enter a valid email address");
+        setIsEmailTaken(false);
       } else {
-        setEmailError("");
-        // Check if email exists when a valid email is entered
+        // Only check if email exists when it's a valid email
         checkEmailExists(value);
       }
     }
@@ -163,17 +164,25 @@ export default function SignupPage() {
 
   // Add email existence check function
   const checkEmailExists = async (email: string) => {
+    if (!email || !validateEmail(email)) return;
+    
     try {
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: false, // This ensures we only check if user exists
+          shouldCreateUser: false,
         }
       });
       
       // If no error, it means the email exists
       if (!error) {
-        setEmailError("This email is already registered. Please use a different email or sign in.");
+        const message = "This email is already registered. Please use a different email or sign in.";
+        setEmailError(message);
+        setIsEmailTaken(true);
+        toast.error(message);
+      } else {
+        setEmailError("");
+        setIsEmailTaken(false);
       }
     } catch (err) {
       console.error("Error checking email:", err);
@@ -185,60 +194,49 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
-    // First check if there's an email error
-    if (emailError) {
-      setError(emailError);
-      setLoading(false);
-      return;
-    }
-
-    // Validate all required fields
-    if (!formData.email || !formData.password || !formData.confirmPassword || !formData.gender) {
-      setError("Please fill in all required fields");
-      setLoading(false);
-      return;
-    }
-
-    // Validate password length
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      setLoading(false);
-      return;
-    }
-
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
-      return;
-    }
-
-    // Validate email before submission
-    if (!validateEmail(formData.email)) {
-      setError("Please enter a valid email address");
-      setLoading(false);
-      return;
-    }
-
-    // Final check if email exists before signup
     try {
-      const { data, error } = await supabase.auth.signInWithOtp({
+      // Validate all required fields
+      if (!formData.email || !formData.password || !formData.confirmPassword || !formData.gender) {
+        throw new Error("Please fill in all required fields");
+      }
+
+      // Validate email format
+      if (!validateEmail(formData.email)) {
+        throw new Error("Please enter a valid email address");
+      }
+
+      // Check if email is taken
+      if (isEmailTaken) {
+        throw new Error("This email is already registered. Please use a different email or sign in.");
+      }
+
+      // Validate password length
+      if (formData.password.length < 6) {
+        throw new Error("Password must be at least 6 characters long");
+      }
+
+      // Validate passwords match
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      // Final check if email exists before signup
+      const { error: emailCheckError } = await supabase.auth.signInWithOtp({
         email: formData.email,
         options: {
           shouldCreateUser: false,
         }
       });
-      
-      // If no error, it means the email exists
-      if (!error) {
+
+      // If no error in email check, it means email exists
+      if (!emailCheckError) {
         const message = "This email is already registered. Please use a different email or sign in.";
-        setError(message);
         setEmailError(message);
-        setLoading(false);
-        return;
+        setIsEmailTaken(true);
+        throw new Error(message);
       }
 
-      // Only proceed with signup if email doesn't exist
+      // Proceed with signup only if email doesn't exist
       const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -251,22 +249,24 @@ export default function SignupPage() {
       });
 
       if (signUpError) {
-        setError(signUpError.message);
         throw signUpError;
       }
 
-      // Show success message and redirect to verify page
+      // Show success message
       setSuccess(true);
+      toast.success("Account created successfully! Please check your email for verification.");
       
       // Sign out the user to ensure they need to verify their email
       await supabase.auth.signOut();
       
       // Redirect to verify page
       router.push("/verify");
+
     } catch (err) {
       console.error("Signup error:", err);
       const errorMessage = err instanceof Error ? err.message : "An error occurred during signup";
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -330,7 +330,7 @@ export default function SignupPage() {
                   value={formData.email}
                   onChange={handleChange}
                   className={`w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 pr-10 ${
-                    emailError ? "border-red-500" : ""
+                    emailError || isEmailTaken ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""
                   }`}
                   required
                 />
@@ -345,7 +345,10 @@ export default function SignupPage() {
                 )}
               </div>
               {emailError && (
-                <p className="text-sm text-red-500 mt-1">{emailError}</p>
+                <p className="text-sm text-red-500 mt-1 flex items-center">
+                  <span className="mr-1">⚠️</span>
+                  {emailError}
+                </p>
               )}
             </div>
 
@@ -494,10 +497,12 @@ export default function SignupPage() {
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white text-sm py-3 shadow-lg hover:shadow-xl transition-all duration-300"
-              disabled={loading || !!emailError}
+              className={`w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white text-sm py-3 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                (loading || isEmailTaken || !!emailError) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={loading || isEmailTaken || !!emailError}
             >
-              {loading ? "Creating Account..." : "Create Account"}
+              {loading ? "Creating Account..." : isEmailTaken ? "Email Already Registered" : "Create Account"}
             </Button>
           </form>
 
