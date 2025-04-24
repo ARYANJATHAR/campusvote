@@ -185,6 +185,13 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
+    // First check if there's an email error
+    if (emailError) {
+      setError(emailError);
+      setLoading(false);
+      return;
+    }
+
     // Validate all required fields
     if (!formData.email || !formData.password || !formData.confirmPassword || !formData.gender) {
       setError("Please fill in all required fields");
@@ -213,7 +220,7 @@ export default function SignupPage() {
       return;
     }
 
-    // Check if email exists before signup
+    // Final check if email exists before signup
     try {
       const { data, error } = await supabase.auth.signInWithOtp({
         email: formData.email,
@@ -224,16 +231,15 @@ export default function SignupPage() {
       
       // If no error, it means the email exists
       if (!error) {
-        setError("This email is already registered. Please use a different email or sign in.");
+        const message = "This email is already registered. Please use a different email or sign in.";
+        setError(message);
+        setEmailError(message);
         setLoading(false);
         return;
       }
-    } catch (err) {
-      console.error("Error checking email:", err);
-    }
 
-    try {
-      const { error } = await supabase.auth.signUp({
+      // Only proceed with signup if email doesn't exist
+      const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -244,9 +250,9 @@ export default function SignupPage() {
         },
       });
 
-      if (error) {
-        setError(error.message);
-        throw error;
+      if (signUpError) {
+        setError(signUpError.message);
+        throw signUpError;
       }
 
       // Show success message and redirect to verify page
@@ -489,7 +495,7 @@ export default function SignupPage() {
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white text-sm py-3 shadow-lg hover:shadow-xl transition-all duration-300"
-              disabled={loading}
+              disabled={loading || !!emailError}
             >
               {loading ? "Creating Account..." : "Create Account"}
             </Button>
