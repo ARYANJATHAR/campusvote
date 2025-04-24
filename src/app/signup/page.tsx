@@ -133,6 +133,8 @@ export default function SignupPage() {
         setEmailError("Please enter a valid email address");
       } else {
         setEmailError("");
+        // Check if email exists when a valid email is entered
+        checkEmailExists(value);
       }
     }
 
@@ -156,6 +158,25 @@ export default function SignupPage() {
       } else {
         setError("");
       }
+    }
+  };
+
+  // Add email existence check function
+  const checkEmailExists = async (email: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false, // This ensures we only check if user exists
+        }
+      });
+      
+      // If no error, it means the email exists
+      if (!error) {
+        setEmailError("This email is already registered. Please use a different email or sign in.");
+      }
+    } catch (err) {
+      console.error("Error checking email:", err);
     }
   };
 
@@ -190,6 +211,25 @@ export default function SignupPage() {
       setError("Please enter a valid email address");
       setLoading(false);
       return;
+    }
+
+    // Check if email exists before signup
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email: formData.email,
+        options: {
+          shouldCreateUser: false,
+        }
+      });
+      
+      // If no error, it means the email exists
+      if (!error) {
+        setError("This email is already registered. Please use a different email or sign in.");
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking email:", err);
     }
 
     try {
