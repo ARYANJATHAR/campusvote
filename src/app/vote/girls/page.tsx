@@ -48,6 +48,18 @@ export default function GirlsVotePage() {
         return;
       }
 
+      // Check if all pairs have been viewed from localStorage
+      const savedState = localStorage.getItem(`votingState_girls_${session.user.id}`);
+      if (savedState) {
+        const parsedState = JSON.parse(savedState);
+        if (parsedState.allPairsViewed) {
+          setAllPairsViewed(true);
+          setCurrentPair([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Fetch all male profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
@@ -354,7 +366,8 @@ export default function GirlsVotePage() {
 
       if (voteError) {
         if (voteError.message.includes('duplicate')) {
-          toast.error('You have already voted in this comparison');
+          // Silently get next pair instead of showing error
+          getNextPair();
         } else {
           toast.error(`Error recording vote: ${voteError.message}`);
         }
