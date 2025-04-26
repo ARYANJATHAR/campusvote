@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
 import { GradientText } from "@/components/landing/GradientText";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { Upload, User, Camera, Save } from "lucide-react";
@@ -234,6 +233,12 @@ export default function RegisterPage() {
       return;
     }
 
+    // Add initial processing toast
+    toast.loading('Processing your registration...', {
+      id: 'registration',
+      duration: Infinity // Keep loading state until next update
+    });
+
     try {
       console.log('Attempting to get user session');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -241,11 +246,19 @@ export default function RegisterPage() {
       if (sessionError) {
         console.error('Session error:', sessionError);
         setError("Authentication error: " + sessionError.message);
+        toast.error("Authentication error. Please try again.", { 
+          id: 'registration',
+          duration: 2500 // 2.5 seconds
+        });
         throw sessionError;
       }
       if (!session?.user) {
         console.error('No user session found');
         setError("No user session found. Please log in again.");
+        toast.error("Session expired. Please log in again.", { 
+          id: 'registration',
+          duration: 2500
+        });
         throw new Error('No user session found');
       }
 
@@ -253,6 +266,10 @@ export default function RegisterPage() {
       if (formData.profileImage) {
         try {
           console.log('Starting profile image upload');
+          toast.loading('Uploading profile image...', { 
+            id: 'registration',
+            duration: Infinity // Keep loading state
+          });
           const fileExt = formData.profileImage.name.split('.').pop();
           const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
           const filePath = `profile-images/${fileName}`;
@@ -264,6 +281,10 @@ export default function RegisterPage() {
           if (uploadError) {
             console.error('Upload error:', uploadError);
             setError("Failed to upload profile image: " + uploadError.message);
+            toast.error("Failed to upload profile image. Please try again.", { 
+              id: 'registration',
+              duration: 2500
+            });
             throw new Error('Failed to upload profile image');
           }
 
@@ -273,8 +294,16 @@ export default function RegisterPage() {
 
           profileImageUrl = publicUrl;
           console.log('Profile image uploaded successfully');
+          toast.loading('Creating your profile...', { 
+            id: 'registration',
+            duration: Infinity // Keep loading state
+          });
         } catch (uploadErr) {
           console.error('Image upload error:', uploadErr);
+          toast.error("Image upload failed. Continuing without profile image.", { 
+            id: 'registration',
+            duration: 2500
+          });
           // Continue without the image if upload fails
         }
       }
@@ -303,10 +332,18 @@ export default function RegisterPage() {
       if (updateError) {
         console.error('Profile update error:', updateError);
         setError(`Failed to update profile: ${updateError.message}`);
+        toast.error("Failed to create profile. Please try again.", { 
+          id: 'registration',
+          duration: 2500
+        });
         throw updateError;
       }
 
       console.log('Profile created successfully');
+      toast.success('Profile created successfully! Redirecting...', { 
+        id: 'registration',
+        duration: 2500
+      });
 
       const gender = session.user.user_metadata?.gender;
       console.log('User gender:', gender);
@@ -314,6 +351,10 @@ export default function RegisterPage() {
       if (!gender) {
         console.error('Gender not found in metadata');
         setError("Gender not found in user metadata");
+        toast.error("Gender information missing. Please contact support.", { 
+          id: 'registration',
+          duration: 2500
+        });
         throw new Error('Gender not found in user metadata');
       }
 
@@ -332,6 +373,10 @@ export default function RegisterPage() {
       console.error('Registration error:', err);
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during registration';
       setError(errorMessage);
+      toast.error(`Registration failed: ${errorMessage}`, { 
+        id: 'registration',
+        duration: 2500
+      });
     } finally {
       setLoading(false);
     }
@@ -349,8 +394,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow bg-gradient-to-b from-indigo-50 to-purple-50 flex items-center justify-center p-4 pt-20 pb-16">
+      <main className="flex-grow bg-gradient-to-b from-indigo-50 to-purple-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-2xl p-8 bg-white/80 backdrop-blur-md border border-gray-100 shadow-xl">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center space-x-2 mb-3">
