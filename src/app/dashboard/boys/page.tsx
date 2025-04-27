@@ -19,7 +19,8 @@ import {
   GraduationCap,
   Book,
   Calendar,
-  MapPin
+  MapPin,
+  Lock
 } from "lucide-react";
 import Link from "next/link";
 import { GradientText } from "@/components/landing/GradientText";
@@ -509,39 +510,40 @@ export default function BoysDashboard() {
                 </Card>
               </div>
 
-              {/* Recent Activity */}
-              <Card className="bg-white/80 backdrop-blur-md border border-gray-100">
-                <CardHeader>
-                  <CardTitle className="text-lg">Recent Votes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {recentVoters.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-6">No votes yet</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {recentVoters.map((voter) => (
-                        <div key={voter.id} className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8 ring-2 ring-indigo-100">
-                            {voter.profileImage ? (
-                              <img src={voter.profileImage} alt={voter.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <AvatarFallback className="bg-indigo-100 text-indigo-600">
-                                {voter.name.charAt(0)}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{voter.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {voter.college} • {voter.timestamp}
-                            </p>
-                          </div>
-                          <Heart className="h-4 w-4 text-indigo-600" />
-                        </div>
-                      ))}
+              {/* Recent Votes */}
+              <Card className="p-4 sm:p-6 relative overflow-hidden">
+                <div className="absolute inset-0 backdrop-blur-md bg-white/30 z-10 flex flex-col items-center justify-center">
+                  <div className="bg-white/80 p-6 rounded-lg text-center">
+                    <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Lock className="h-6 w-6 text-purple-600" />
                     </div>
-                  )}
-                </CardContent>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Subscribe to See Your Votes</h3>
+                    <p className="text-sm text-gray-600 mb-4">Unlock to see who voted for you!</p>
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                      Subscribe Now
+                    </Button>
+                  </div>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">Recent Votes</h2>
+                <div className="space-y-4">
+                  {recentVoters.map((voter) => (
+                    <div key={voter.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <Avatar className="w-10 h-10">
+                        {voter.profileImage ? (
+                          <img src={voter.profileImage} alt={voter.name} className="object-cover" />
+                        ) : (
+                          <AvatarFallback>
+                            {voter.name.charAt(0)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-600">{voter.name}</p>
+                        <p className="text-xs text-gray-400">{voter.timestamp}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </Card>
 
               {/* Quick Actions */}
