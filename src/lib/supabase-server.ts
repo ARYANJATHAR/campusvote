@@ -26,14 +26,14 @@ export function createServerSupabaseClient() {
           try {
             cookieStore.set({ name, value, ...options })
           } catch (error) {
-            // Silently handle error
+            console.warn('Failed to set cookie:', name, error)
           }
         },
         remove(name: string, options: any) {
           try {
             cookieStore.set({ name, value: '', ...options })
           } catch (error) {
-            // Silently handle error
+            console.warn('Failed to remove cookie:', name, error)
           }
         },
       },

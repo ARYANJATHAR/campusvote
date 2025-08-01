@@ -21,19 +21,6 @@ export default function Navbar() {
 
   const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/register';
 
-  useEffect(() => {
-    const handleBeforeUnload = async () => {
-      if (isAuthenticated) {
-        await supabase.auth.signOut();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isAuthenticated, supabase.auth]);
 
   useEffect(() => {
     const getUserSession = async () => {
@@ -88,18 +75,13 @@ export default function Navbar() {
     return '/leaderboard';  // Always return the common leaderboard page
   };
 
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
-      router.push('/login');
+      router.push("/");
     } catch (error) {
-      console.error('Error logging out:', error);
+      console.error('Error signing out:', error);
     }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
   };
 
   return (
