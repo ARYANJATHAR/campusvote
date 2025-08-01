@@ -8,6 +8,22 @@ const getPairKey = (id1: string, id2: string) => {
   return [id1, id2].sort().join('_');
 };
 
+// Helper function to find the first unseen pair using exhaustive search
+const findFirstUnseenPair = (
+  profilesList: Profile[], 
+  viewedPairs: Set<string>
+): Profile[] => {
+  for (let i = 0; i < profilesList.length; i++) {
+    for (let j = i + 1; j < profilesList.length; j++) {
+      const pairKey = getPairKey(profilesList[i].id, profilesList[j].id);
+      if (!viewedPairs.has(pairKey)) {
+        return [profilesList[i], profilesList[j]];
+      }
+    }
+  }
+  return []; // All pairs viewed
+};
+
 // Generate a random pair from profiles list
 const generateRandomPair = (
   profilesList: Profile[], 
@@ -21,16 +37,7 @@ const generateRandomPair = (
   // If most profiles are viewed, do a more thorough search
   const availableProfiles = profilesList.filter(p => !viewedProfiles.has(p.id));
   if (availableProfiles.length < 2) {
-    // Try to find any pair that hasn't been viewed yet
-    for (let i = 0; i < profilesList.length; i++) {
-      for (let j = i + 1; j < profilesList.length; j++) {
-        const pairKey = getPairKey(profilesList[i].id, profilesList[j].id);
-        if (!viewedPairs.has(pairKey)) {
-          return [profilesList[i], profilesList[j]];
-        }
-      }
-    }
-    return []; // All pairs viewed
+    return findFirstUnseenPair(profilesList, viewedPairs);
   }
   
   // Try to find a random pair that hasn't been viewed yet
@@ -53,15 +60,8 @@ const generateRandomPair = (
     }
   }
   
-  // If we couldn't find an unseen pair after maxAttempts, try with the first available unseen pair
-  for (let i = 0; i < profilesList.length; i++) {
-    for (let j = i + 1; j < profilesList.length; j++) {
-      const pairKey = getPairKey(profilesList[i].id, profilesList[j].id);
-      if (!viewedPairs.has(pairKey)) {
-        return [profilesList[i], profilesList[j]];
-      }
-    }
-  }
+  // If we couldn't find an unseen pair after maxAttempts, use exhaustive search
+  return findFirstUnseenPair(profilesList, viewedPairs);
   
   return []; // All pairs viewed
 };
